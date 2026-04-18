@@ -1,0 +1,19 @@
+001 | header/Новости | Новости | https://www.zerno.ru/news_list | https://www.zerno.ru/news_list | 001_header_новости.png
+002 | header/Новости/Аналитика | Аналитика | https://www.zerno.ru/analytics_list | https://www.zerno.ru/analytics_list | 002_header_новости_аналитика.png
+003 | header/Новости/Новости России | Новости России | https://www.zerno.ru/russian_news_list | https://www.zerno.ru/russian_news_list | 003_header_новости_новости_россии.png
+004 | header/Новости/Мировые новости | Мировые новости | https://www.zerno.ru/world_news_list | https://www.zerno.ru/world_news_list | 004_header_новости_мировые_новости.png
+005 | header/Новости/Главные новости | Главные новости | https://www.zerno.ru/hot_news_list | https://www.zerno.ru/hot_news_list | 005_header_новости_главные_новости.png
+006 | header/Новости/Пресс-релизы | Пресс-релизы | https://www.zerno.ru/ | https://www.zerno.ru/ | 006_header_новости_пресс-релизы.png
+007 | header/Пшеница 3 класса
+» | Пшеница 3 класса
+» | http://zerno.ru/cerealspricescalendar/2020/wheat/3 | https://www.zerno.ru/cerealspricescalendar/2020/wheat/3 | 007_header_пшеница_3_класса.png
+008 | header/Пшеница 3 класса
+»/Пшеница 4 класса
+» | Пшеница 4 класса
+» | http://zerno.ru/cerealspricescalendar/2020/wheat/4 | https://www.zerno.ru/cerealspricescalendar/2020/wheat/4 | 008_header_пшеница_3_класса_пшеница_4_класса.png
+009 | header/Пшеница 3 класса
+»/Пшеница 5 класса
+» | Пшеница 5 класса
+» | http://zerno.ru/cerealspricescalendar/2020/wheat/5 | https://www.zerno.ru/cerealspricescalendar/2020/wheat/5 | 009_header_пшеница_3_класса_пшеница_5_класса.png
+010 | header/Пшеница 3 класса
+»/Пшеница 4 класса, протеин ≥ 12,5% | Пшеница 4 класса, протеин ≥ 12,5% | https://www.zerno.ru/regional-prices-cereals-125-maxdate | https://www.zerno.ru/regional-prices-cereals-125-maxdate | 010_header_пшеница_3_класса_пшеница_4_класса_протеин_12_5.png

@@ -1,0 +1,31 @@
+{
+  "browsers": [],
+  "drivers": [
+    {
+      "major_browser_version": "147",
+      "driver_name": "chromedriver",
+      "driver_version": "147.0.7727.57",
+      "driver_ttl": 1776429527
+    }
+  ],
+  "stats": [
+    {
+      "browser": "chrome",
+      "browser_version": "",
+      "os": "windows",
+      "arch": "amd64",
+      "lang": "python",
+      "selenium_version": "4.30",
+      "stats_ttl": 1776429308
+    },
+    {
+      "browser": "microsoftedge",
+      "browser_version": "",
+      "os": "windows",
+      "arch": "amd64",
+      "lang": "python",
+      "selenium_version": "4.30",
+      "stats_ttl": 1776429308
+    }
+  ]
+}

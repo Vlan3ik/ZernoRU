@@ -1,0 +1,55 @@
+001 | header/Новости | Новости | https://www.zerno.ru/news_list | https://www.zerno.ru/news_list | 001_header_новости.png
+002 | header/Новости/Аналитика | Аналитика | https://www.zerno.ru/analytics_list | https://www.zerno.ru/analytics_list | 002_header_новости_аналитика.png
+003 | header/Новости/Новости России | Новости России | https://www.zerno.ru/russian_news_list | https://www.zerno.ru/russian_news_list | 003_header_новости_новости_россии.png
+004 | header/Новости/Мировые новости | Мировые новости | https://www.zerno.ru/world_news_list | https://www.zerno.ru/world_news_list | 004_header_новости_мировые_новости.png
+005 | header/Новости/Главные новости | Главные новости | https://www.zerno.ru/hot_news_list | https://www.zerno.ru/hot_news_list | 005_header_новости_главные_новости.png
+006 | header/Новости/Пресс-релизы | Пресс-релизы | https://www.zerno.ru/ | https://www.zerno.ru/ | 006_header_новости_пресс-релизы.png
+007 | header/Пшеница 3 класса
+» | Пшеница 3 класса
+» | http://zerno.ru/cerealspricescalendar/2020/wheat/3 | https://www.zerno.ru/cerealspricescalendar/2020/wheat/3 | 007_header_пшеница_3_класса.png
+008 | header/Пшеница 3 класса
+»/Пшеница 4 класса
+» | Пшеница 4 класса
+» | http://zerno.ru/cerealspricescalendar/2020/wheat/4 | https://www.zerno.ru/cerealspricescalendar/2020/wheat/4 | 008_header_пшеница_3_класса_пшеница_4_класса.png
+009 | header/Пшеница 3 класса
+»/Пшеница 5 класса
+» | Пшеница 5 класса
+» | http://zerno.ru/cerealspricescalendar/2020/wheat/5 | https://www.zerno.ru/cerealspricescalendar/2020/wheat/5 | 009_header_пшеница_3_класса_пшеница_5_класса.png
+010 | header/Пшеница 3 класса
+»/Пшеница 4 класса, протеин ≥ 12,5% | Пшеница 4 класса, протеин ≥ 12,5% | https://www.zerno.ru/regional-prices-cereals-125-maxdate | https://www.zerno.ru/regional-prices-cereals-125-maxdate | 010_header_пшеница_3_класса_пшеница_4_класса_протеин_12_5.png
+011 | header/Пшеница 3 класса
+»/Пшеница 4 класса, протеин ≥ 12,5 в порту | Пшеница 4 класса, протеин ≥ 12,5 в порту | https://www.zerno.ru/regional-prices-cereals-125-maxdate-port | https://www.zerno.ru/regional-prices-cereals-125-maxdate-port | 011_header_пшеница_3_класса_пшеница_4_класса_протеин_12_5_в_порту.png
+012 | header/Пшеница 3 класса
+»/Пшеница по регионам | Пшеница по регионам | https://www.zerno.ru/regional-prices-wheat-minimum-and-maximum | https://www.zerno.ru/regional-prices-wheat-minimum-and-maximum | 012_header_пшеница_3_класса_пшеница_по_регионам.png
+013 | header/Пшеница 3 класса
+»/Кукуруза
+» | Кукуруза
+» | https://www.zerno.ru/cerealspricescalendar/2020/corn | https://www.zerno.ru/cerealspricescalendar/2020/corn | 013_header_пшеница_3_класса_кукуруза.png
+014 | header/Пшеница 3 класса
+»/Ячмень
+» | Ячмень
+» | https://www.zerno.ru/cerealspricescalendar/2020/barley | https://www.zerno.ru/cerealspricescalendar/2020/barley | 014_header_пшеница_3_класса_ячмень.png
+015 | header/Россия/Украина | Украина | https://www.zerno.ru/ukraine_news_list | https://www.zerno.ru/ukraine_news_list | 015_header_россия_украина.png
+016 | header/Россия/Казахстан | Казахстан | https://www.zerno.ru/kazakhstan_news_list | https://www.zerno.ru/kazakhstan_news_list | 016_header_россия_казахстан.png
+017 | header/Россия/Грузия | Грузия | https://www.zerno.ru/georgia_news_list | https://www.zerno.ru/georgia_news_list | 017_header_россия_грузия.png
+018 | header/Россия/Белоруссия | Белоруссия | https://www.zerno.ru/belarus_news_list | https://www.zerno.ru/belarus_news_list | 018_header_россия_белоруссия.png
+019 | header/Россия/Киргизия | Киргизия | https://www.zerno.ru/kirgiziya_news_list | https://www.zerno.ru/kirgiziya_news_list | 019_header_россия_киргизия.png
+020 | header/Россия/Молдова | Молдова | https://www.zerno.ru/%D0%BColdova_news_list | https://www.zerno.ru/%D0%BColdova_news_list | 020_header_россия_молдова.png
+021 | header/Россия/Узбекистан | Узбекистан | https://www.zerno.ru/uzbekistan_news_list | https://www.zerno.ru/uzbekistan_news_list | 021_header_россия_узбекистан.png
+022 | header/Россия/Армения | Армения | https://www.zerno.ru/armenia_news_list | https://www.zerno.ru/armenia_news_list | 022_header_россия_армения.png
+023 | header/Россия/Мировая экономика | Мировая экономика | https://www.zerno.ru/world_economy_news_list | https://www.zerno.ru/world_economy_news_list | 023_header_россия_мировая_экономика.png
+024 | header/Россия/СНГ, Грузия и Прибалтика | СНГ, Грузия и Прибалтика | https://www.zerno.ru/sis_news_list | https://www.zerno.ru/sis_news_list | 024_header_россия_снг_грузия_и_прибалтика.png
+025 | header/Зерновые | Зерновые | https://www.zerno.ru/grain_news_list | https://www.zerno.ru/grain_news_list | 025_header_зерновые.png
+026 | header/Зерновые/Пшеница | Пшеница | https://www.zerno.ru/wheat_news_list | https://www.zerno.ru/wheat_news_list | 026_header_зерновые_пшеница.png
+027 | header/Зерновые/Ячмень | Ячмень | https://www.zerno.ru/barley_news_list | https://www.zerno.ru/barley_news_list | 027_header_зерновые_ячмень.png
+028 | header/Зерновые/Кукуруза | Кукуруза | https://www.zerno.ru/corn_news_list | https://www.zerno.ru/corn_news_list | 028_header_зерновые_кукуруза.png
+029 | header/Зерновые/Рожь | Рожь | https://www.zerno.ru/rye_news_list | https://www.zerno.ru/rye_news_list | 029_header_зерновые_рожь.png
+030 | header/Зерновые/Рис | Рис | https://www.zerno.ru/rice_news_list | https://www.zerno.ru/rice_news_list | 030_header_зерновые_рис.png
+031 | header/Зерновые/Гречиха | Гречиха | https://www.zerno.ru/buckwheat_news_list | https://www.zerno.ru/buckwheat_news_list | 031_header_зерновые_гречиха.png
+032 | header/Зерновые/Мука | Мука | https://www.zerno.ru/flour_news_list | https://www.zerno.ru/flour_news_list | 032_header_зерновые_мука.png
+033 | header/Зерновые/Соя | Соя | https://www.zerno.ru/soybean_news_list | https://www.zerno.ru/soybean_news_list | 033_header_зерновые_соя.png
+034 | header/Зерновые/Удобрения | Удобрения | https://www.zerno.ru/fertilizer_news_list | https://www.zerno.ru/fertilizer_news_list | 034_header_зерновые_удобрения.png
+035 | header/RSS | RSS | https://www.zerno.ru/rss.xml | https://www.zerno.ru/rss.xml | 035_header_rss.png
+036 | header/Контакты | Контакты | https://www.zerno.ru/node/7867 | https://www.zerno.ru/node/7867 | 036_header_контакты.png
+037 | header/Telegram | Telegram | https://t.me/poleonline | https://t.me/poleonline | 037_header_telegram.png
+038 | header/Реклама | Реклама | https://www.zerno.ru/node/12886 | https://www.zerno.ru/node/12886 | 038_header_реклама.png

@@ -1,0 +1,15 @@
+﻿export const STORAGE_KEYS = {
+  users: 'zerno.users',
+  sellerApplications: 'zerno.sellerApplications',
+  grainLots: 'zerno.grainLots',
+  equipmentLots: 'zerno.equipmentLots',
+  forumPosts: 'zerno.forumPosts',
+  forumReplies: 'zerno.forumReplies',
+  notifications: 'zerno.notifications',
+  carts: 'zerno.carts',
+  orders: 'zerno.orders',
+  subscriptions: 'zerno.subscriptions',
+  bootstrapped: 'zerno.bootstrapped.v2',
+};
+
+
