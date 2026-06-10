@@ -28,7 +28,6 @@ export class AppErrorBoundary extends Component<Props, State> {
   }
 
   resetApp = () => {
-    localStorage.clear();
     window.location.reload();
   };
 
@@ -42,11 +41,11 @@ export class AppErrorBoundary extends Component<Props, State> {
                 Не удалось загрузить приложение
               </Typography.Title>
               <Typography.Text type="secondary">
-                Обнаружена ошибка инициализации данных. Нажмите кнопку ниже для очистки локального кеша и перезапуска.
+                Обнаружена ошибка инициализации данных. Нажмите кнопку ниже для перезапуска приложения.
               </Typography.Text>
               <Typography.Text code>{this.state.errorMessage || 'Unknown error'}</Typography.Text>
               <Button type="primary" onClick={this.resetApp}>
-                Сбросить локальные данные и перезапустить
+                Перезапустить
               </Button>
             </Space>
           </Card>
@@ -57,4 +56,3 @@ export class AppErrorBoundary extends Component<Props, State> {
     return this.props.children;
   }
 }
-

@@ -1,5 +1,7 @@
 ﻿import { Navigate, Route, Routes } from 'react-router-dom';
 import { AppShell } from '../components/layout/AppShell';
+import { AdminPage } from '../pages/AdminPage';
+import { AuthPage } from '../pages/AuthPage';
 import { CabinetPage } from '../pages/CabinetPage';
 import {
   CountryDetailPage,
@@ -15,8 +17,8 @@ import { LogisticsPage } from '../pages/LogisticsPage';
 import { LotDetailPage } from '../pages/LotDetailPage';
 import { MarketplacePage } from '../pages/MarketplacePage';
 import { NewsDetailPage, NewsPage } from '../pages/NewsPage';
-import { PlaceholderPage } from '../pages/PlaceholderPage';
 import { PriceDetailPage, PricesPage } from '../pages/PricesPage';
+import { ReferenceCatalogPage } from '../pages/ReferenceCatalogPage';
 import { SearchResultsPage } from '../pages/SearchResultsPage';
 import { SellerVerificationPage } from '../pages/SellerRegistrationPage';
 import {
@@ -45,6 +47,8 @@ export function AppRouter() {
   return (
     <AppShell>
       <Routes>
+        <Route path="/auth" element={<AuthPage />} />
+        <Route path="/admin" element={<AdminPage />} />
         <Route path="/" element={<HomePage />} />
 
         <Route path="/news" element={<NewsPage />} />
@@ -107,10 +111,86 @@ export function AppRouter() {
         <Route path="/privacy" element={<ContentArticlePage title="Политика конфиденциальности" sections={buildStaticSections('Политика конфиденциальности')} />} />
         <Route path="/terms" element={<ContentArticlePage title="Пользовательское соглашение" sections={buildStaticSections('Пользовательское соглашение')} />} />
 
-        <Route path="/exchange" element={<PlaceholderPage title="Биржевые котировки" description="Ключевые биржевые индикаторы по зерновым рынкам." />} />
-        <Route path="/duties" element={<PlaceholderPage title="Пошлины" description="Экспортные и внутренние пошлины по культурам и направлениям." />} />
-        <Route path="/rail-tariffs" element={<PlaceholderPage title="Ж/д тарифы" description="Тарифы, ограничения и сезонные коэффициенты по железнодорожным перевозкам." />} />
-        <Route path="/routes" element={<PlaceholderPage title="Маршруты" description="Типовые маршруты поставки и сроки доставки по регионам." />} />
+        <Route
+          path="/exchange"
+          element={
+            <ReferenceCatalogPage
+              category="exchange"
+              title="Биржевые котировки"
+              description="Ключевые биржевые ориентиры по зерновому рынку, загруженные из backend snapshot."
+            />
+          }
+        />
+        <Route
+          path="/exchange/:slug"
+          element={
+            <ReferenceCatalogPage
+              category="exchange"
+              title="Биржевые котировки"
+              description="Ключевые биржевые ориентиры по зерновому рынку, загруженные из backend snapshot."
+            />
+          }
+        />
+        <Route
+          path="/duties"
+          element={
+            <ReferenceCatalogPage
+              category="duties"
+              title="Пошлины"
+              description="Экспортные и внутренние пошлины по культурам и направлениям."
+            />
+          }
+        />
+        <Route
+          path="/duties/:slug"
+          element={
+            <ReferenceCatalogPage
+              category="duties"
+              title="Пошлины"
+              description="Экспортные и внутренние пошлины по культурам и направлениям."
+            />
+          }
+        />
+        <Route
+          path="/rail-tariffs"
+          element={
+            <ReferenceCatalogPage
+              category="rail-tariffs"
+              title="Ж/д тарифы"
+              description="Тарифы, ограничения и сезонные коэффициенты по железнодорожным перевозкам."
+            />
+          }
+        />
+        <Route
+          path="/rail-tariffs/:slug"
+          element={
+            <ReferenceCatalogPage
+              category="rail-tariffs"
+              title="Ж/д тарифы"
+              description="Тарифы, ограничения и сезонные коэффициенты по железнодорожным перевозкам."
+            />
+          }
+        />
+        <Route
+          path="/routes"
+          element={
+            <ReferenceCatalogPage
+              category="routes"
+              title="Маршруты"
+              description="Типовые маршруты поставки и сроки доставки по регионам."
+            />
+          }
+        />
+        <Route
+          path="/routes/:slug"
+          element={
+            <ReferenceCatalogPage
+              category="routes"
+              title="Маршруты"
+              description="Типовые маршруты поставки и сроки доставки по регионам."
+            />
+          }
+        />
 
         <Route path="/organizations" element={<Navigate to="/directories/organizations" replace />} />
         <Route path="/organizations/:orgId" element={<OrganizationProfilePage />} />
@@ -120,4 +200,3 @@ export function AppRouter() {
     </AppShell>
   );
 }
-

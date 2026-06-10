@@ -1,77 +1,145 @@
-﻿import { ArrowRightOutlined } from '@ant-design/icons';
 import { Button, Card, Col, Progress, Row, Space, Table, Tag, Typography } from 'antd';
 import { useNavigate } from 'react-router-dom';
-import { newsFeed, priceRows } from '../data/portalContent';
+import { newsImageMap } from '../data/mediaAssets';
 import { useAppStore } from '../store/appStore';
 
-const metrics = [
-  { title: 'Пшеница 3 класс', value: '16 800 ?/т', day: '+1,3%', week: '+3,8%' },
-  { title: 'Пшеница 4 класс', value: '15 620 ?/т', day: '+0,9%', week: '+2,2%' },
-  { title: 'Кукуруза', value: '15 120 ?/т', day: '+0,7%', week: '+2,6%' },
-  { title: 'Экспортный спрос', value: '71,2', day: '+0,4', week: '+1,9' },
-];
+function formatRubles(value: number) {
+  return value.toLocaleString('ru-RU');
+}
+
+function resolveNewsImage(id: string) {
+  return newsImageMap[id] ?? newsImageMap['n-1'] ?? '/images/thematic/image_01.jpg';
+}
 
 export function HomePage() {
   const navigate = useNavigate();
   const grainLots = useAppStore((state) => state.grainLots);
   const equipmentLots = useAppStore((state) => state.equipmentLots);
   const posts = useAppStore((state) => state.posts);
+  const news = useAppStore((state) => state.news);
+  const prices = useAppStore((state) => state.prices);
+  const analytics = useAppStore((state) => state.analytics);
+
+  const heroNews = news[0];
+  const leadLots = [...grainLots.slice(0, 2), ...equipmentLots.slice(0, 2)];
+
+  const summaryCards = [
+    { title: 'Активные лоты', value: `${grainLots.length + equipmentLots.length}`, note: 'зерно, техника, услуги' },
+    { title: 'Новости дня', value: `${news.length}`, note: 'только российский и СНГ рынок' },
+    { title: 'Темы форума', value: `${posts.length}`, note: 'обсуждения и ответы' },
+    { title: 'Строки цен', value: `${prices.length}`, note: 'обновляемая витрина котировок' },
+  ];
 
   return (
-    <Space direction="vertical" size={28} style={{ width: '100%' }}>
-      <Card className="section-card">
-        <Typography.Title level={1}>Рынок зерна сегодня</Typography.Title>
-        <Typography.Paragraph className="lead-text">
-          Сводка по ценам, активным лотам, логистике и аналитике. Главная отвечает на три вопроса: что происходит,
-          по какой цене торгуют и куда перейти дальше.
-        </Typography.Paragraph>
-        <Row gutter={[16, 16]}>
-          {metrics.map((metric) => (
-            <Col key={metric.title} xs={24} sm={12} xl={6}>
-              <Card className="metric-card">
-                <Typography.Text className="metric-title">{metric.title}</Typography.Text>
-                <Typography.Title level={3} className="metric-value">{metric.value}</Typography.Title>
-                <Space>
-                  <Tag color="green">День {metric.day}</Tag>
-                  <Tag color="blue">Неделя {metric.week}</Tag>
-                </Space>
-              </Card>
-            </Col>
-          ))}
+    <Space direction="vertical" size={24} style={{ width: '100%' }}>
+      <Card className="section-card home-hero">
+        <Row gutter={[24, 24]} align="middle">
+          <Col xs={24} xl={12}>
+            <Space direction="vertical" size={16} className="home-hero__copy">
+              <Tag color="green" className="home-hero__eyebrow">
+                Информационно-торговый портал
+              </Tag>
+              <Typography.Title level={1} className="home-hero__title">
+                Главная витрина рынка зерна, цен и сделок
+              </Typography.Title>
+              <Typography.Paragraph className="lead-text home-hero__lead">
+                На одном экране собраны новости, биржевые ориентиры, активные лоты, логистика и аналитика по рынку России и СНГ.
+              </Typography.Paragraph>
+              <Space wrap>
+                <Button type="primary" size="large" onClick={() => navigate('/marketplace?tab=grain')}>
+                  Торговая площадка
+                </Button>
+                <Button size="large" onClick={() => navigate('/news')}>
+                  Новости
+                </Button>
+                <Button size="large" onClick={() => navigate('/prices')}>
+                  Цены
+                </Button>
+              </Space>
+            </Space>
+          </Col>
+
+          <Col xs={24} xl={12}>
+            <Row gutter={[14, 14]} className="home-hero__stats">
+              {summaryCards.map((item) => (
+                <Col xs={12} key={item.title}>
+                  <Card className="home-hero-stat">
+                    <Typography.Text type="secondary" className="home-hero-stat__title">
+                      {item.title}
+                    </Typography.Text>
+                    <Typography.Title level={3} className="home-hero-stat__value">
+                      {item.value}
+                    </Typography.Title>
+                    <Typography.Text type="secondary" className="home-hero-stat__note">
+                      {item.note}
+                    </Typography.Text>
+                  </Card>
+                </Col>
+              ))}
+            </Row>
+          </Col>
         </Row>
       </Card>
 
       <Row gutter={[24, 24]}>
         <Col xs={24} xl={14}>
-          <Card title="Главные новости" extra={<Button type="link" onClick={() => navigate('/news')}>Смотреть все</Button>}>
-            <Space direction="vertical" size={16} style={{ width: '100%' }}>
-              {newsFeed.slice(0, 4).map((item) => (
-                <Card key={item.id} className="nested-card" onClick={() => navigate(`/news/${item.id}`)}>
-                  <Space direction="vertical" size={4}>
-                    <Space>
-                      <Tag>{item.section}</Tag>
-                      <Typography.Text type="secondary">{item.date}</Typography.Text>
+          <Card
+            className="home-feature-card"
+            title="Главная новость дня"
+            extra={<Button type="link" onClick={() => navigate('/news')}>Все новости</Button>}
+          >
+            {heroNews ? (
+              <Row gutter={[18, 18]} align="middle">
+                <Col xs={24} md={10}>
+                  <img src={resolveNewsImage(heroNews.id)} alt={heroNews.title} className="home-news-image" />
+                </Col>
+                <Col xs={24} md={14}>
+                  <Space direction="vertical" size={10}>
+                    <Space wrap>
+                      <Tag color="green">{heroNews.section}</Tag>
+                      <Tag color="blue">{heroNews.culture}</Tag>
+                      <Tag>{heroNews.region}</Tag>
+                      <Typography.Text type="secondary">{heroNews.date}</Typography.Text>
                     </Space>
-                    <Typography.Title level={4}>{item.title}</Typography.Title>
-                    <Typography.Paragraph>{item.lead}</Typography.Paragraph>
+                    <Typography.Title level={3}>{heroNews.title}</Typography.Title>
+                    <Typography.Paragraph>{heroNews.lead}</Typography.Paragraph>
+                    <Space wrap>
+                      <Button type="primary" onClick={() => navigate(`/news/${heroNews.id}`)}>
+                        Открыть новость
+                      </Button>
+                      <Button onClick={() => navigate('/prices')}>
+                        Перейти к ценам
+                      </Button>
+                    </Space>
                   </Space>
-                </Card>
-              ))}
-            </Space>
+                </Col>
+              </Row>
+            ) : (
+              <Typography.Text type="secondary">Новостей пока нет.</Typography.Text>
+            )}
           </Card>
         </Col>
 
         <Col xs={24} xl={10}>
-          <Card title="Актуальные цены" extra={<Button type="link" onClick={() => navigate('/prices')}>Смотреть все</Button>}>
+          <Card
+            className="home-feature-card"
+            title="Актуальные цены"
+            extra={<Button type="link" onClick={() => navigate('/prices')}>Все котировки</Button>}
+          >
             <Table
               size="middle"
-              rowKey="key"
+              rowKey="id"
               pagination={false}
-              dataSource={priceRows.slice(0, 4)}
+              dataSource={prices.slice(0, 5)}
               columns={[
                 { title: 'Культура', dataIndex: 'culture', key: 'culture' },
                 { title: 'Регион', dataIndex: 'region', key: 'region' },
-                { title: 'Цена', dataIndex: 'day', key: 'day', render: (value: number) => `${value.toLocaleString('ru-RU')} ?` },
+                {
+                  title: 'Цена',
+                  dataIndex: 'day',
+                  key: 'day',
+                  render: (value: number) => `${formatRubles(value)} ₽/т`,
+                },
               ]}
             />
           </Card>
@@ -80,96 +148,117 @@ export function HomePage() {
 
       <Row gutter={[24, 24]}>
         <Col xs={24} xl={8}>
-          <Card title="Торговая площадка" extra={<Button type="link" onClick={() => navigate('/marketplace')}>Смотреть все</Button>}>
-            <Space direction="vertical" style={{ width: '100%' }}>
-              <QuickLink title="Зерно" text="Фильтры по качеству, объему и условиям сделки." path="/marketplace?tab=grain" />
-              <QuickLink title="Техника" text="Каталог машин с документами и условиями лизинга." path="/marketplace?tab=equipment" />
-              <QuickLink title="Услуги" text="Перевозка, хранение, лаборатории и страхование." path="/marketplace?tab=services" />
-            </Space>
-          </Card>
-        </Col>
-
-        <Col xs={24} xl={8}>
-          <Card title="Логистика" extra={<Button type="link" onClick={() => navigate('/logistics')}>Смотреть все</Button>}>
+          <Card className="home-mini-card" title="Торговая площадка" extra={<Button type="link" onClick={() => navigate('/marketplace')}>Открыть</Button>}>
             <Space direction="vertical" size={12} style={{ width: '100%' }}>
-              <Typography.Text>Загрузка транспорта по ключевым направлениям</Typography.Text>
-              <Progress percent={72} strokeColor="#2f6f3e" />
-              <Typography.Text>Средний срок доставки по ЦФО: 2,4 дня</Typography.Text>
-              <Typography.Text>Доля маршрутов без задержек: 81%</Typography.Text>
+              <Typography.Text className="home-mini-card__text">
+                Проверенные продавцы, документы, логистика и аукционы в одном потоке.
+              </Typography.Text>
+              <Button block type="primary" onClick={() => navigate('/marketplace?tab=grain')}>
+                Смотреть лоты зерна
+              </Button>
+              <Progress percent={84} strokeColor="#2f6f3e" showInfo={false} />
+              <Space wrap>
+                <Tag color="green">Проверенные продавцы</Tag>
+                <Tag color="blue">Документы</Tag>
+                <Tag color="gold">Аукционы</Tag>
+              </Space>
             </Space>
           </Card>
         </Col>
 
         <Col xs={24} xl={8}>
-          <Card title="Форум и аналитика" extra={<Button type="link" onClick={() => navigate('/forum')}>Смотреть все</Button>}>
+          <Card className="home-mini-card" title="Логистика" extra={<Button type="link" onClick={() => navigate('/logistics')}>Открыть</Button>}>
+            <Space direction="vertical" size={10} style={{ width: '100%' }}>
+              <Typography.Text>Средний срок доставки по ключевым направлениям</Typography.Text>
+              <Progress percent={72} strokeColor="#2f6f3e" />
+              <Typography.Text>Срок маршрута ЦФО → ЮФО: 2,4 дня</Typography.Text>
+              <Typography.Text>Доля маршрутов без задержек: 81%</Typography.Text>
+              <Button onClick={() => navigate('/routes')}>Посмотреть маршруты</Button>
+            </Space>
+          </Card>
+        </Col>
+
+        <Col xs={24} xl={8}>
+          <Card className="home-mini-card" title="Форум и аналитика" extra={<Button type="link" onClick={() => navigate('/forum')}>Открыть</Button>}>
             <Space direction="vertical" size={10} style={{ width: '100%' }}>
               <Typography.Text>Активных тем: {posts.length}</Typography.Text>
-              <Typography.Text>Новых комментариев за сутки: 18</Typography.Text>
-              <Typography.Text>Экспертных ответов: 7</Typography.Text>
-              <Button onClick={() => navigate('/analytics')}>Открыть аналитику и прогнозы</Button>
+              <Typography.Text>Новостей с аналитикой: {news.filter((item) => item.section === 'Аналитика').length}</Typography.Text>
+              <Typography.Text>Публикаций в этом месяце: {analytics.length}</Typography.Text>
+              <Button onClick={() => navigate('/analytics')}>Перейти в аналитику</Button>
             </Space>
           </Card>
         </Col>
       </Row>
 
-      <Row gutter={[24, 24]}>
-        <Col xs={24} xl={12}>
-          <Card title="Новые лоты зерна" extra={<Button type="link" onClick={() => navigate('/marketplace?tab=grain')}>Смотреть все</Button>}>
-            <Space direction="vertical" size={10} style={{ width: '100%' }}>
-              {grainLots.map((lot) => (
-                <Card key={lot.id} className="nested-card" onClick={() => navigate(`/marketplace/lot/${lot.id}`)}>
-                  <Row justify="space-between" align="middle">
-                    <Col>
-                      <Typography.Text strong>{lot.title}</Typography.Text>
-                      <Typography.Paragraph type="secondary">{lot.region}</Typography.Paragraph>
-                    </Col>
-                    <Col>
-                      <Typography.Text strong>{lot.pricePerTon.toLocaleString('ru-RU')} ?/т</Typography.Text>
-                    </Col>
-                  </Row>
-                </Card>
-              ))}
-            </Space>
-          </Card>
-        </Col>
+      <Card className="home-lots-card" title="Свежие лоты" extra={<Button type="link" onClick={() => navigate('/marketplace')}>Все лоты</Button>}>
+        <Row gutter={[16, 16]}>
+          {leadLots.map((lot) => (
+            <Col key={lot.id} xs={24} lg={12}>
+              <Card className="home-lot-card" onClick={() => navigate(`/marketplace/lot/${lot.id}`)}>
+                <Row gutter={[14, 14]} align="middle">
+                  <Col xs={24} md={8}>
+                    <div className="home-lot-card__media">
+                      <img
+                        src={lot.coverImageUrl ?? '/images/thematic/image_01.jpg'}
+                        alt={lot.title}
+                        className="home-lot-card__image"
+                      />
+                    </div>
+                  </Col>
+                  <Col xs={24} md={16}>
+                    <Space direction="vertical" size={10} style={{ width: '100%' }}>
+                      <Space wrap>
+                        <Tag color="green">{lot.category === 'grain' ? lot.grainType : lot.brand}</Tag>
+                        <Tag color="blue">{lot.region}</Tag>
+                        <Tag>{lot.category === 'grain' ? `${lot.grade}` : `${lot.year} г.`}</Tag>
+                      </Space>
+                      <Typography.Title level={4} className="home-lot-card__title">
+                        {lot.title}
+                      </Typography.Title>
+                      <Typography.Text type="secondary">{lot.description}</Typography.Text>
+                      <Space wrap>
+                        <Tag color="green">
+                          {lot.category === 'grain' ? `${formatRubles(lot.pricePerTon)} ₽/т` : `${formatRubles(lot.price)} ₽`}
+                        </Tag>
+                        <Tag color="gold">Проверенный продавец</Tag>
+                      </Space>
+                    </Space>
+                  </Col>
+                </Row>
+              </Card>
+            </Col>
+          ))}
+        </Row>
+      </Card>
 
-        <Col xs={24} xl={12}>
-          <Card title="Новые лоты техники" extra={<Button type="link" onClick={() => navigate('/marketplace?tab=equipment')}>Смотреть все</Button>}>
-            <Space direction="vertical" size={10} style={{ width: '100%' }}>
-              {equipmentLots.map((lot) => (
-                <Card key={lot.id} className="nested-card" onClick={() => navigate(`/marketplace/lot/${lot.id}`)}>
-                  <Row justify="space-between" align="middle">
-                    <Col>
-                      <Typography.Text strong>{lot.title}</Typography.Text>
-                      <Typography.Paragraph type="secondary">{lot.region}</Typography.Paragraph>
-                    </Col>
-                    <Col>
-                      <Typography.Text strong>{lot.price.toLocaleString('ru-RU')} ?</Typography.Text>
-                    </Col>
-                  </Row>
-                </Card>
-              ))}
+      <Card className="home-rail-card" title="Биржевые ориентиры и комментарии">
+        <Row gutter={[16, 16]}>
+          <Col xs={24} md={8}>
+            <Space direction="vertical" size={8} style={{ width: '100%' }}>
+              <Typography.Text strong>Биржевые котировки</Typography.Text>
+              <Typography.Text>Биржа Санкт-Петербург: пшеница 3 класс — 16 840 ₽/т</Typography.Text>
+              <Typography.Text>МосБиржа: кукуруза — 15 120 ₽/т</Typography.Text>
+              <Typography.Text>Новороссийск FOB: ячмень — 13 950 ₽/т</Typography.Text>
             </Space>
-          </Card>
-        </Col>
-      </Row>
+          </Col>
+          <Col xs={24} md={8}>
+            <Space direction="vertical" size={8} style={{ width: '100%' }}>
+              <Typography.Text strong>Индексы</Typography.Text>
+              <Typography.Text>Индекс внутреннего рынка ЦФО: 16 840 ₽/т</Typography.Text>
+              <Typography.Text>Индекс экспортного спроса: 71,2</Typography.Text>
+              <Typography.Text>Индекс логистической нагрузки: 58,4</Typography.Text>
+            </Space>
+          </Col>
+          <Col xs={24} md={8}>
+            <Space direction="vertical" size={8} style={{ width: '100%' }}>
+              <Typography.Text strong>Комментарии рынка</Typography.Text>
+              <Typography.Text>Экспортная премия по протеину 12,5% сохраняется.</Typography.Text>
+              <Typography.Text>В портах растет число заявок на майские отгрузки.</Typography.Text>
+              <Typography.Text>Ставки на зерновозы стабилизировались после пика сезона.</Typography.Text>
+            </Space>
+          </Col>
+        </Row>
+      </Card>
     </Space>
   );
 }
-
-function QuickLink({ title, text, path }: { title: string; text: string; path: string }) {
-  const navigate = useNavigate();
-
-  return (
-    <Card className="nested-card">
-      <Space direction="vertical" size={6}>
-        <Typography.Text strong>{title}</Typography.Text>
-        <Typography.Text type="secondary">{text}</Typography.Text>
-        <Button type="link" onClick={() => navigate(path)} icon={<ArrowRightOutlined />}>
-          Перейти
-        </Button>
-      </Space>
-    </Card>
-  );
-}
-

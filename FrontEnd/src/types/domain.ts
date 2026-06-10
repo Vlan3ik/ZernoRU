@@ -7,6 +7,7 @@ export type EquipmentCondition = 'new' | 'used';
 
 export interface UserProfile {
   id: string;
+  email: string;
   name: string;
   role: 'buyer' | 'seller';
   region: string;
@@ -14,6 +15,7 @@ export interface UserProfile {
   inn?: string;
   ogrn?: string;
   isVerifiedSeller?: boolean;
+  sellerVerificationStatus?: string;
 }
 
 export interface SellerApplication {
@@ -45,6 +47,7 @@ export interface GrainLot {
   mercuryCertificate: string;
   declarationOfConformity: string;
   storageContract: string;
+  coverImageUrl?: string;
   createdAt: string;
 }
 
@@ -60,6 +63,7 @@ export interface EquipmentLot {
   price: number;
   region: string;
   description: string;
+  coverImageUrl?: string;
   createdAt: string;
 }
 
@@ -120,6 +124,27 @@ export interface AnalyticsPoint {
   supply: number;
 }
 
+export interface NewsArticle {
+  id: string;
+  section: string;
+  title: string;
+  lead: string;
+  date: string;
+  country: string;
+  culture: string;
+  region: string;
+  type: string;
+  imageUrl?: string;
+}
+
+export interface PriceRecord {
+  id: string;
+  culture: string;
+  region: string;
+  day: number;
+  weekChange: number;
+}
+
 export interface ForumPost {
   id: string;
   section: 'Агрономия' | 'Торговля' | 'Техника';
@@ -150,4 +175,18 @@ export interface NotificationItem {
   viewed: boolean;
 }
 
+export interface SellerDocumentInput {
+  innKpp: string;
+  ogrn: string;
+  mercuryCertificate: string;
+  declarationOfConformity: string;
+  storageContract: string;
+}
 
+export interface SellerActivityItem {
+  id: string;
+  createdAt: string;
+  title: string;
+  description: string;
+  status: 'info' | 'success' | 'warning';
+}

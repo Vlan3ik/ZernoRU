@@ -1,7 +1,8 @@
-﻿import { Button, Card, Flex, InputNumber, Space, Statistic, Typography, message } from 'antd';
+import { Button, Card, Flex, InputNumber, Space, Statistic, Typography, message } from 'antd';
 import { useEffect, useMemo, useState } from 'react';
 import dayjs from 'dayjs';
 import { useAppStore } from '../../store/appStore';
+import { getAuctionState, setAuctionState } from '../../services/auctionState';
 
 interface AuctionBid {
   userId: string;
@@ -12,25 +13,6 @@ interface AuctionBid {
 interface AuctionLotState {
   highestBid: number;
   bids: AuctionBid[];
-}
-
-type AuctionState = Record<string, AuctionLotState>;
-
-const STORAGE_KEY = 'zerno_marketplace_auction_v1';
-
-function getAuctionState(): AuctionState {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return {};
-    const parsed = JSON.parse(raw) as AuctionState;
-    return parsed && typeof parsed === 'object' ? parsed : {};
-  } catch {
-    return {};
-  }
-}
-
-function setAuctionState(next: AuctionState) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
 }
 
 interface Props {
@@ -44,8 +26,7 @@ export function AuctionBidPanel({ lotId, basePrice }: Props) {
   const [bidAmount, setBidAmount] = useState<number>(basePrice);
 
   useEffect(() => {
-    const all = getAuctionState();
-    setState(all[lotId] ?? { highestBid: 0, bids: [] });
+    setState(getAuctionState(lotId));
   }, [lotId]);
 
   const step = useMemo(() => Math.max(100, Math.round(basePrice * 0.005)), [basePrice]);
@@ -60,11 +41,8 @@ export function AuctionBidPanel({ lotId, basePrice }: Props) {
     }
 
     const bid: AuctionBid = { userId: currentUserId, amount: bidAmount, createdAt: new Date().toISOString() };
-    const all = getAuctionState();
-    const lotState = all[lotId] ?? { highestBid: 0, bids: [] };
-    const nextState: AuctionLotState = { highestBid: bidAmount, bids: [bid, ...lotState.bids].slice(0, 8) };
-    all[lotId] = nextState;
-    setAuctionState(all);
+    const nextState: AuctionLotState = { highestBid: bidAmount, bids: [bid, ...state.bids].slice(0, 8) };
+    setAuctionState(lotId, nextState);
     setState(nextState);
     setBidAmount(nextState.highestBid + step);
     message.success('Ставка принята');

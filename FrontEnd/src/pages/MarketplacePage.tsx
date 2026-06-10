@@ -1,10 +1,11 @@
 ﻿import {
   CheckCircleOutlined,
   ClockCircleOutlined,
-  FileTextOutlined,
+  DownloadOutlined,
   FilterOutlined,
   HeartOutlined,
-  SafetyCertificateOutlined,
+  LoginOutlined,
+  PhoneOutlined,
   ShoppingCartOutlined,
 } from '@ant-design/icons';
 import {
@@ -12,27 +13,25 @@ import {
   Button,
   Card,
   Col,
-  Divider,
   Empty,
   InputNumber,
+  Modal,
   Row,
-  Segmented,
   Select,
   Space,
   Switch,
-  Tabs,
   Tag,
   Typography,
+  message,
 } from 'antd';
-import { useMemo, useState } from 'react';
+import { ReactNode, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { AuctionBidPanel } from '../components/marketplace/AuctionBidPanel';
-import { lotImageMap, serviceImageMap } from '../data/mediaAssets';
 import { useAppStore } from '../store/appStore';
 import { EquipmentLot, GrainLot, UserProfile } from '../types/domain';
+import { lotImageMap, serviceImageMap } from '../data/mediaAssets';
 
 type MarketplaceTab = 'grain' | 'equipment' | 'services';
-type ListingMode = 'all' | 'direct' | 'auction' | 'urgent' | 'verified';
+type ListingMode = 'all' | 'direct' | 'auction';
 
 interface ServiceCardData {
   id: string;
@@ -50,34 +49,84 @@ const serviceOffers: ServiceCardData[] = [
   { id: 'srv-5', title: 'Сопровождение сделки', description: 'Юридическая проверка документов и договоров поставки.', region: 'Россия', priceFrom: 6500 },
 ];
 
+const categoryTabs: Array<{ key: MarketplaceTab; label: string; icon: ReactNode }> = [
+  { key: 'grain', label: 'Зерно', icon: <WheatIcon /> },
+  { key: 'equipment', label: 'Техника', icon: <TractorIcon /> },
+  { key: 'services', label: 'Услуги', icon: <HandshakeIcon /> },
+];
+
+function resolveLotImage(lot: GrainLot | EquipmentLot) {
+  return lot.coverImageUrl ?? lotImageMap[lot.id]?.[0] ?? '/images/thematic/image_01.jpg';
+}
+
+function resolveServiceImage(serviceId: string) {
+  return serviceImageMap[serviceId] ?? '/images/thematic/image_13.jpg';
+}
+
+function formatMoney(value: number) {
+  return value.toLocaleString('ru-RU');
+}
+
+function splitRegion(region: string) {
+  const parts = region.split(',').map((item) => item.trim()).filter(Boolean);
+  return {
+    main: parts[0] ?? region,
+    sub: parts[1] ?? '',
+  };
+}
+
+function downloadDocs(lot: GrainLot | EquipmentLot) {
+  const payload = [
+    `Лот: ${lot.title}`,
+    `Продавец: ${lot.sellerName}`,
+    `Регион: ${lot.region}`,
+    `Описание: ${lot.description}`,
+    lot.category === 'grain'
+      ? `Документы: ${lot.mercuryCertificate}; ${lot.declarationOfConformity}; ${lot.storageContract}`
+      : 'Документы: ПСМ; договор купли-продажи',
+  ].join('\n');
+
+  const blob = new Blob([payload], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `${lot.id}-documents.txt`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
 export function MarketplacePage() {
   const grainLots = useAppStore((state) => state.grainLots);
   const equipmentLots = useAppStore((state) => state.equipmentLots);
   const users = useAppStore((state) => state.users);
   const addToCart = useAppStore((state) => state.addToCart);
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
 
   const initialTab = (searchParams.get('tab') as MarketplaceTab) ?? 'grain';
   const [tab, setTab] = useState<MarketplaceTab>(initialTab);
   const [mode, setMode] = useState<ListingMode>('all');
   const [query, setQuery] = useState('');
   const [region, setRegion] = useState<string | undefined>();
-  const [district, setDistrict] = useState<string | undefined>();
   const [culture, setCulture] = useState<string | undefined>();
   const [grade, setGrade] = useState<string | undefined>();
-  const [delivery, setDelivery] = useState<string | undefined>();
-  const [saleFormat, setSaleFormat] = useState<string | undefined>();
-  const [documents, setDocuments] = useState(false);
+  const [documentsOnly, setDocumentsOnly] = useState(false);
   const [verifiedOnly, setVerifiedOnly] = useState(false);
+  const [stockOnly, setStockOnly] = useState(false);
+  const [expandedFilters, setExpandedFilters] = useState(false);
   const [priceFrom, setPriceFrom] = useState<number | undefined>();
   const [priceTo, setPriceTo] = useState<number | undefined>();
+  const [contactOpen, setContactOpen] = useState(false);
+  const [contactSeller, setContactSeller] = useState<UserProfile | null>(null);
 
   const sellerMap = useMemo(() => users.reduce<Record<string, UserProfile>>((acc, user) => ({ ...acc, [user.id]: user }), {}), [users]);
 
   const searchOptions = useMemo(() => {
     const sellers = users.map((user) => ({ value: user.name, label: `Продавец: ${user.name}` }));
     const cultures = [...new Set(grainLots.map((lot) => lot.grainType))].map((item) => ({ value: item, label: `Культура: ${item}` }));
-    const regions = [...new Set([...grainLots.map((lot) => lot.region), ...equipmentLots.map((lot) => lot.region)])].map((item) => ({ value: item, label: `Регион: ${item}` }));
+    const regions = [...new Set([...grainLots.map((lot) => lot.region), ...equipmentLots.map((lot) => lot.region), ...serviceOffers.map((item) => item.region)])].map((item) => ({ value: item, label: `Регион: ${item}` }));
     return [...sellers, ...cultures, ...regions];
   }, [users, grainLots, equipmentLots]);
 
@@ -86,25 +135,20 @@ export function MarketplacePage() {
       grainLots.filter((lot) => {
         const seller = sellerMap[lot.sellerId];
         const text = `${lot.title} ${lot.description} ${lot.sellerName} ${lot.region}`.toLowerCase();
-
         if (query && !text.includes(query.toLowerCase())) return false;
         if (culture && lot.grainType !== culture) return false;
         if (grade && lot.grade !== grade) return false;
         if (region && !lot.region.includes(region)) return false;
-        if (district && !lot.region.toLowerCase().includes(district.toLowerCase())) return false;
         if (verifiedOnly && !seller?.isVerifiedSeller) return false;
-        if (documents && !(lot.mercuryCertificate && lot.declarationOfConformity && lot.storageContract)) return false;
+        if (documentsOnly && !(lot.mercuryCertificate && lot.declarationOfConformity && lot.storageContract)) return false;
+        if (stockOnly && lot.volumeTons <= 0) return false;
         if (priceFrom !== undefined && lot.pricePerTon < priceFrom) return false;
         if (priceTo !== undefined && lot.pricePerTon > priceTo) return false;
         if (mode === 'direct' && lot.auctionEnabled) return false;
         if (mode === 'auction' && !lot.auctionEnabled) return false;
-        if (mode === 'urgent' && lot.volumeTons > 100) return false;
-        if (mode === 'verified' && !seller?.isVerifiedSeller) return false;
-        if (saleFormat === 'Прямая продажа' && lot.auctionEnabled) return false;
-        if (saleFormat === 'Аукцион' && !lot.auctionEnabled) return false;
         return true;
       }),
-    [culture, district, documents, grade, grainLots, mode, priceFrom, priceTo, query, region, saleFormat, sellerMap, verifiedOnly],
+    [culture, documentsOnly, grade, grainLots, mode, priceFrom, priceTo, query, region, sellerMap, stockOnly, verifiedOnly],
   );
 
   const filteredEquipment = useMemo(
@@ -112,13 +156,11 @@ export function MarketplacePage() {
       equipmentLots.filter((lot) => {
         const seller = sellerMap[lot.sellerId];
         const text = `${lot.title} ${lot.description} ${lot.sellerName} ${lot.region} ${lot.brand}`.toLowerCase();
-
         if (query && !text.includes(query.toLowerCase())) return false;
         if (region && !lot.region.includes(region)) return false;
+        if (verifiedOnly && !seller?.isVerifiedSeller) return false;
         if (priceFrom !== undefined && lot.price < priceFrom) return false;
         if (priceTo !== undefined && lot.price > priceTo) return false;
-        if (verifiedOnly && !seller?.isVerifiedSeller) return false;
-        if (mode === 'verified' && !seller?.isVerifiedSeller) return false;
         return true;
       }),
     [equipmentLots, mode, priceFrom, priceTo, query, region, sellerMap, verifiedOnly],
@@ -134,225 +176,502 @@ export function MarketplacePage() {
     [query, region],
   );
 
+  const activeResults = tab === 'grain' ? filteredGrain : tab === 'equipment' ? filteredEquipment : filteredServices;
+
   const resetFilters = () => {
     setQuery('');
     setRegion(undefined);
-    setDistrict(undefined);
     setCulture(undefined);
     setGrade(undefined);
-    setDelivery(undefined);
-    setSaleFormat(undefined);
-    setDocuments(false);
+    setMode('all');
+    setDocumentsOnly(false);
     setVerifiedOnly(false);
+    setStockOnly(false);
     setPriceFrom(undefined);
     setPriceTo(undefined);
-    setMode('all');
   };
+
+  const openContact = (sellerId: string) => {
+    setContactSeller(sellerMap[sellerId] ?? null);
+    setContactOpen(true);
+  };
+
+  const startDeal = async (lot: GrainLot | EquipmentLot) => {
+    await addToCart(lot);
+    navigate('/cart');
+  };
+
+  const topFilters = [
+    { label: 'Пшеница', active: tab === 'grain' && !culture, onClick: () => { setTab('grain'); setSearchParams({ tab: 'grain' }); setCulture(undefined); } },
+    { label: 'Ячмень', active: tab === 'grain' && culture === 'Ячмень', onClick: () => { setTab('grain'); setSearchParams({ tab: 'grain' }); setCulture('Ячмень'); } },
+    { label: 'Смоленская область', active: Boolean(region?.includes('Смолен')), onClick: () => setRegion('Смоленская область') },
+    { label: 'Документы подтверждены', active: documentsOnly, onClick: () => setDocumentsOnly((value) => !value) },
+  ];
 
   return (
     <Space direction="vertical" size={24} style={{ width: '100%' }}>
-      <Card className="section-card">
-        <Typography.Title level={1}>Торговая площадка</Typography.Title>
-        <Typography.Paragraph className="lead-text">Покупка и продажа зерна, техники и услуг с гибкими режимами выдачи и фильтрами по качеству, документам и надежности продавца.</Typography.Paragraph>
+      <Card className="section-card marketplace-hero">
+        <Row gutter={[24, 24]} align="middle">
+          <Col xs={24} xl={12}>
+            <Space direction="vertical" size={16} className="marketplace-hero__copy">
+              <Typography.Title level={1} className="marketplace-title">
+                Торговая площадка
+              </Typography.Title>
+              <Typography.Paragraph className="lead-text marketplace-lead">
+                Лоты проверенных продавцов: зерно, документы, логистика и сделки в одном экране.
+              </Typography.Paragraph>
+              <Space wrap>
+                <Button type="primary" size="large" icon={<ShoppingCartOutlined />} onClick={() => navigate('/marketplace?tab=grain')}>
+                  Разместить лот
+                </Button>
+                <Button size="large" onClick={() => navigate('/auth')} icon={<LoginOutlined />}>
+                  Вход
+                </Button>
+              </Space>
+            </Space>
+          </Col>
+
+          <Col xs={24} xl={12}>
+            <Row gutter={[16, 16]} className="marketplace-hero__features">
+              <Col xs={12} xl={12}>
+                <FeatureCard icon={<ShieldIcon />} title="Проверенные продавцы" text="Мы проверяем продавцов для вашей уверенности" />
+              </Col>
+              <Col xs={12} xl={12}>
+                <FeatureCard icon={<DocumentIcon />} title="С документами" text="Только лоты с полным пакетом документов" />
+              </Col>
+              <Col xs={12} xl={12}>
+                <FeatureCard icon={<SearchGlyph />} title="Быстрый поиск" text="Удобные фильтры помогают найти лучшее предложение" />
+              </Col>
+              <Col xs={12} xl={12}>
+                <FeatureCard icon={<WheatTruckIcon />} title="Зерно / Техника / Услуги" text="Широкий выбор категорий для вашего бизнеса" />
+              </Col>
+            </Row>
+          </Col>
+        </Row>
       </Card>
 
-      <Tabs
-        activeKey={tab}
-        onChange={(value) => {
-          const next = value as MarketplaceTab;
-          setTab(next);
-          setSearchParams({ tab: next });
-        }}
-        items={[{ key: 'grain', label: 'Зерно' }, { key: 'equipment', label: 'Техника' }, { key: 'services', label: 'Услуги' }]}
-      />
+      <div className="marketplace-filter-pills">
+        {categoryTabs.map((item) => (
+          <Button
+            key={item.key}
+            className={`marketplace-category-pill ${tab === item.key ? 'is-active' : ''}`}
+            onClick={() => {
+              setTab(item.key);
+              setSearchParams({ tab: item.key });
+            }}
+            icon={item.icon}
+            size="large"
+          >
+            {item.label}
+          </Button>
+        ))}
+      </div>
 
-      <Card title="Режимы выдачи">
-        <Segmented
-          value={mode}
-          onChange={(value) => setMode(value as ListingMode)}
-          options={[
-            { label: 'Все лоты', value: 'all' },
-            { label: 'Прямые продажи', value: 'direct' },
-            { label: 'Аукционы', value: 'auction' },
-            { label: 'Срочные', value: 'urgent' },
-            { label: 'Проверенные продавцы', value: 'verified' },
-          ]}
-          block
-        />
-      </Card>
+      <div className="marketplace-mode-strip">
+        {[
+          { label: 'Все лоты', value: 'all' as ListingMode },
+          { label: 'Прямые продажи', value: 'direct' as ListingMode },
+          { label: 'Аукционы', value: 'auction' as ListingMode },
+        ].map((item) => (
+          <Button
+            key={item.value}
+            className={`marketplace-mode-pill ${mode === item.value ? 'is-active' : ''}`}
+            onClick={() => setMode(item.value)}
+            size="large"
+            icon={item.value === 'all' ? <GridIcon /> : item.value === 'direct' ? <HandshakeOutlineIcon /> : <AuctionIcon />}
+          >
+            {item.label}
+          </Button>
+        ))}
+      </div>
 
-      <Card title="Поиск и фильтры" extra={<Button onClick={resetFilters}>Сбросить фильтры</Button>}>
+      <Card className="marketplace-filter-panel" title={<Space><FilterOutlined />Поиск и фильтры</Space>} extra={<Button onClick={() => setExpandedFilters((value) => !value)}>{expandedFilters ? 'Скрыть фильтры' : 'Показать ещё фильтры'}</Button>}>
         <Space direction="vertical" size={16} style={{ width: '100%' }}>
-          <AutoComplete value={query} options={searchOptions} onChange={setQuery} style={{ width: '100%' }} placeholder="Поиск по культурам, регионам, продавцам и типам лотов" />
-
-          <Row gutter={[12, 12]}>
-            <Col xs={24} md={12} xl={6}><Select allowClear value={region} onChange={setRegion} placeholder="Регион" style={{ width: '100%' }} options={[...new Set([...grainLots.map((lot) => lot.region), ...equipmentLots.map((lot) => lot.region), ...serviceOffers.map((item) => item.region)])].map((value) => ({ value, label: value }))} /></Col>
-            <Col xs={24} md={12} xl={6}><Select allowClear value={district} onChange={setDistrict} placeholder="Район" style={{ width: '100%' }} options={[{ value: 'Вяземский', label: 'Вяземский' }, { value: 'Гагарин', label: 'Гагарин' }, { value: 'Смоленск', label: 'Смоленск' }]} /></Col>
-            <Col xs={24} md={12} xl={6}><InputNumber value={priceFrom} min={0} placeholder="Цена от" style={{ width: '100%' }} onChange={(value) => setPriceFrom(value === null ? undefined : Number(value))} /></Col>
-            <Col xs={24} md={12} xl={6}><InputNumber value={priceTo} min={0} placeholder="Цена до" style={{ width: '100%' }} onChange={(value) => setPriceTo(value === null ? undefined : Number(value))} /></Col>
+          <Row gutter={[12, 12]} align="middle">
+            <Col xs={24} xl={18}>
+              <AutoComplete
+                value={query}
+                options={searchOptions}
+                onChange={setQuery}
+                style={{ width: '100%' }}
+                placeholder="Поиск по культурам, регионам, продавцам и типам лотов"
+              />
+            </Col>
+            <Col xs={24} xl={6}>
+              <Button block onClick={resetFilters}>
+                Сбросить фильтры
+              </Button>
+            </Col>
           </Row>
 
-          {tab === 'grain' && (
+          <Row gutter={[12, 12]}>
+            <Col xs={24} md={12} xl={6}>
+              <Select allowClear value={region} onChange={setRegion} placeholder="Регион" style={{ width: '100%' }} options={[...new Set([...grainLots.map((lot) => lot.region), ...equipmentLots.map((lot) => lot.region), ...serviceOffers.map((item) => item.region)])].map((value) => ({ value, label: value }))} />
+            </Col>
+            {tab === 'grain' && (
+              <>
+                <Col xs={24} md={12} xl={6}>
+                  <Select allowClear value={culture} onChange={setCulture} placeholder="Культура" style={{ width: '100%' }} options={[...new Set(grainLots.map((lot) => lot.grainType))].map((value) => ({ value, label: value }))} />
+                </Col>
+                <Col xs={24} md={12} xl={6}>
+                  <Select allowClear value={grade} onChange={setGrade} placeholder="Класс" style={{ width: '100%' }} options={[...new Set(grainLots.map((lot) => lot.grade))].map((value) => ({ value, label: value }))} />
+                </Col>
+              </>
+            )}
+            <Col xs={24} md={12} xl={6}>
+              <InputNumber value={priceFrom} min={0} placeholder="Цена от" style={{ width: '100%' }} onChange={(value) => setPriceFrom(value === null ? undefined : Number(value))} />
+            </Col>
+            <Col xs={24} md={12} xl={6}>
+              <InputNumber value={priceTo} min={0} placeholder="Цена до" style={{ width: '100%' }} onChange={(value) => setPriceTo(value === null ? undefined : Number(value))} />
+            </Col>
+          </Row>
+
+          <Row gutter={[12, 12]}>
+            <Col xs={24} lg={8}>
+              <FilterSwitch checked={documentsOnly} onChange={setDocumentsOnly} label="Только с документами" />
+            </Col>
+            <Col xs={24} lg={8}>
+              <FilterSwitch checked={verifiedOnly} onChange={setVerifiedOnly} label="Проверенные продавцы" />
+            </Col>
+            <Col xs={24} lg={8}>
+              <FilterSwitch checked={stockOnly} onChange={setStockOnly} label="Только в наличии" />
+            </Col>
+          </Row>
+
+          {expandedFilters && (
             <Row gutter={[12, 12]}>
-              <Col xs={24} md={12} xl={6}><Select allowClear value={culture} onChange={setCulture} placeholder="Культура" style={{ width: '100%' }} options={[...new Set(grainLots.map((lot) => lot.grainType))].map((value) => ({ value, label: value }))} /></Col>
-              <Col xs={24} md={12} xl={6}><Select allowClear value={grade} onChange={setGrade} placeholder="Класс" style={{ width: '100%' }} options={[...new Set(grainLots.map((lot) => lot.grade))].map((value) => ({ value, label: value }))} /></Col>
-              <Col xs={24} md={12} xl={6}><Select allowClear value={delivery} onChange={setDelivery} placeholder="Вид поставки" style={{ width: '100%' }} options={[{ value: 'Самовывоз', label: 'Самовывоз' }, { value: 'Доставка продавцом', label: 'Доставка продавцом' }, { value: 'Партнерская перевозка', label: 'Партнерская перевозка' }]} /></Col>
-              <Col xs={24} md={12} xl={6}><Select allowClear value={saleFormat} onChange={setSaleFormat} placeholder="Формат продажи" style={{ width: '100%' }} options={[{ value: 'Прямая продажа', label: 'Прямая продажа' }, { value: 'Аукцион', label: 'Аукцион' }]} /></Col>
+              <Col xs={24} md={12} xl={6}>
+                <Select
+                  allowClear
+                  placeholder="Формат сделки"
+                  style={{ width: '100%' }}
+                  value={undefined}
+                  options={[
+                    { value: 'direct', label: 'Прямые продажи' },
+                    { value: 'auction', label: 'Аукционы' },
+                  ]}
+                />
+              </Col>
+              <Col xs={24} md={12} xl={6}>
+                <Select
+                  allowClear
+                  placeholder="Поставка"
+                  style={{ width: '100%' }}
+                  value={undefined}
+                  options={[
+                    { value: 'pickup', label: 'Самовывоз' },
+                    { value: 'delivery', label: 'Доставка' },
+                  ]}
+                />
+              </Col>
+              <Col xs={24} md={12} xl={6}>
+                <Select
+                  allowClear
+                  placeholder="Логистика"
+                  style={{ width: '100%' }}
+                  value={undefined}
+                  options={[
+                    { value: 'own', label: 'Собственная' },
+                    { value: 'partner', label: 'Партнерская' },
+                  ]}
+                />
+              </Col>
+              <Col xs={24} md={12} xl={6}>
+                <Select
+                  allowClear
+                  placeholder="Склад / элеватор"
+                  style={{ width: '100%' }}
+                  value={undefined}
+                  options={[
+                    { value: 'yes', label: 'Есть' },
+                    { value: 'no', label: 'Нет' },
+                  ]}
+                />
+              </Col>
             </Row>
           )}
-
-          <Space size={24} wrap>
-            <Space><Switch checked={documents} onChange={setDocuments} /><Typography.Text>Только с документами</Typography.Text></Space>
-            <Space><Switch checked={verifiedOnly} onChange={setVerifiedOnly} /><Typography.Text>Только проверенные продавцы</Typography.Text></Space>
-          </Space>
         </Space>
       </Card>
 
-      <Row gutter={[24, 24]}>
-        <Col xs={24} xl={6}>
-          <Card title={<Space><FilterOutlined />Боковая панель фильтров</Space>}>
-            <Space direction="vertical" size={10} style={{ width: '100%' }}>
-              <Segmented value={tab} onChange={(value) => setTab(value as MarketplaceTab)} options={[{ label: 'Зерно', value: 'grain' }, { label: 'Техника', value: 'equipment' }, { label: 'Услуги', value: 'services' }]} block />
-              <Typography.Text type="secondary">Панель дублирует фильтры и режимы выдачи для быстрого уточнения списка.</Typography.Text>
-              <Button block onClick={resetFilters}>Очистить параметры</Button>
-            </Space>
+      <div className="marketplace-top-tags">
+        {topFilters.map((item) => (
+          <Tag key={item.label} color={item.active ? 'green' : 'default'} className="marketplace-top-tag" onClick={item.onClick}>
+            {item.label}
+          </Tag>
+        ))}
+      </div>
+
+      <Space direction="vertical" size={24} style={{ width: '100%' }}>
+        {tab === 'grain' && (
+      <Row gutter={[24, 24]} align="top">
+            {filteredGrain.map((lot) => (
+              <Col key={lot.id} xs={24} xl={12}>
+                <GrainLotCard
+                  lot={lot}
+                  isVerified={Boolean(sellerMap[lot.sellerId]?.isVerifiedSeller)}
+                  onContact={() => openContact(lot.sellerId)}
+                  onDownload={() => downloadDocs(lot)}
+                  onStartDeal={() => void startDeal(lot)}
+                />
+              </Col>
+            ))}
+          </Row>
+        )}
+
+        {tab === 'equipment' && (
+          <Row gutter={[24, 24]}>
+            {filteredEquipment.map((lot) => (
+              <Col key={lot.id} xs={24} xl={12}>
+                <EquipmentLotCard
+                  lot={lot}
+                  isVerified={Boolean(sellerMap[lot.sellerId]?.isVerifiedSeller)}
+                  onContact={() => openContact(lot.sellerId)}
+                  onDownload={() => downloadDocs(lot)}
+                  onStartDeal={() => void startDeal(lot)}
+                />
+              </Col>
+            ))}
+          </Row>
+        )}
+
+        {tab === 'services' && (
+          <Row gutter={[24, 24]}>
+            {filteredServices.map((service) => (
+              <Col key={service.id} xs={24} xl={12}>
+                <ServiceLotCard service={service} onContact={() => message.success('Запрос отправлен поставщику услуги')} />
+              </Col>
+            ))}
+          </Row>
+        )}
+
+        {!activeResults.length && (
+          <Card>
+            <Empty description="Ничего не найдено по выбранным фильтрам">
+              <Button type="primary" onClick={resetFilters}>
+                Сбросить фильтры
+              </Button>
+            </Empty>
           </Card>
-        </Col>
+        )}
+      </Space>
 
-        <Col xs={24} xl={18}>
-          {tab === 'grain' && (
-            <Space direction="vertical" size={16} style={{ width: '100%' }}>
-              {filteredGrain.map((lot) => <GrainLotCard key={lot.id} lot={lot} isVerified={Boolean(sellerMap[lot.sellerId]?.isVerifiedSeller)} onAdd={() => addToCart(lot)} />)}
-              {!filteredGrain.length && <EmptyState title="Лоты зерна не найдены" actionLabel="Сбросить фильтры" onAction={resetFilters} />}
-            </Space>
-          )}
-
-          {tab === 'equipment' && (
-            <Space direction="vertical" size={16} style={{ width: '100%' }}>
-              {filteredEquipment.map((lot) => <EquipmentLotCard key={lot.id} lot={lot} isVerified={Boolean(sellerMap[lot.sellerId]?.isVerifiedSeller)} onAdd={() => addToCart(lot)} />)}
-              {!filteredEquipment.length && <EmptyState title="Лоты техники не найдены" actionLabel="Сбросить фильтры" onAction={resetFilters} />}
-            </Space>
-          )}
-
-          {tab === 'services' && (
-            <Space direction="vertical" size={16} style={{ width: '100%' }}>
-              {filteredServices.map((item) => (
-                <Card key={item.id} className="lot-card">
-                  <Row gutter={[16, 16]}>
-                    <Col xs={24} md={8}><img src={serviceImageMap[item.id]} alt={item.title} className="lot-image-thumb" /></Col>
-                    <Col xs={24} md={16}>
-                      <Space direction="vertical" size={8} style={{ width: '100%' }}>
-                        <Typography.Title level={4}>{item.title}</Typography.Title>
-                        <Typography.Paragraph>{item.description}</Typography.Paragraph>
-                        <Space><Tag>{item.region}</Tag><Tag color="green">От {item.priceFrom.toLocaleString('ru-RU')} ₽</Tag></Space>
-                        <Space><Button type="primary">Запросить условия</Button><Button>Добавить в избранное</Button></Space>
-                      </Space>
-                    </Col>
-                  </Row>
-                </Card>
-              ))}
-              {!filteredServices.length && <EmptyState title="Услуги не найдены" actionLabel="Сбросить фильтры" onAction={resetFilters} />}
-            </Space>
-          )}
-        </Col>
-      </Row>
+      <Modal
+        title="Связаться с продавцом"
+        open={contactOpen}
+        onCancel={() => setContactOpen(false)}
+        footer={[
+          <Button key="close" onClick={() => setContactOpen(false)}>
+            Закрыть
+          </Button>,
+        ]}
+      >
+        {contactSeller ? (
+          <Space direction="vertical" size={8} style={{ width: '100%' }}>
+            <Typography.Text strong>{contactSeller.name}</Typography.Text>
+            <Typography.Text>{contactSeller.email}</Typography.Text>
+            <Typography.Text>{contactSeller.region}</Typography.Text>
+            <Typography.Text type="secondary">
+              Контакты подставлены из backend snapshot. Для продавца можно переключать каналы связи в профиле поставщика.
+            </Typography.Text>
+          </Space>
+        ) : (
+          <Typography.Text type="secondary">Продавец не найден.</Typography.Text>
+        )}
+      </Modal>
     </Space>
   );
 }
 
-function GrainLotCard({ lot, isVerified, onAdd }: { lot: GrainLot; isVerified: boolean; onAdd: () => void }) {
+function GrainLotCard({
+  lot,
+  isVerified,
+  onContact,
+  onDownload,
+  onStartDeal,
+}: {
+  lot: GrainLot;
+  isVerified: boolean;
+  onContact: () => void;
+  onDownload: () => void;
+  onStartDeal: () => void;
+}) {
   const navigate = useNavigate();
   const hasDocs = Boolean(lot.mercuryCertificate && lot.declarationOfConformity && lot.storageContract);
+  const region = splitRegion(lot.region);
+  const total = lot.volumeTons * lot.pricePerTon;
+  const auctionBid = lot.auctionEnabled ? Math.round(lot.pricePerTon * 0.985) : null;
 
   return (
-    <Card className="lot-card">
-      <Row gutter={[16, 16]}>
-        <Col xs={24} xl={6}><img src={lotImageMap[lot.id]?.[0]} alt={lot.title} className="lot-image-thumb" /></Col>
-        <Col xs={24} xl={11}>
-          <Space direction="vertical" size={10} style={{ width: '100%' }}>
-            <Space wrap>
-              <Tag color="green">{lot.grainType}</Tag>
-              <Tag color="blue">{lot.grade}</Tag>
-              <Tag color={isVerified ? 'success' : 'warning'} icon={<SafetyCertificateOutlined />}>{isVerified ? 'Проверенный продавец' : 'Продавец без проверки'}</Tag>
-              {lot.auctionEnabled && <Tag color="purple" icon={<ClockCircleOutlined />}>Аукционный лот</Tag>}
-            </Space>
-            <Typography.Title level={3}>{lot.title}</Typography.Title>
-            <div className="grain-grid">
-              <InfoCell label="Цена за тонну" value={`${lot.pricePerTon.toLocaleString('ru-RU')} ₽/т`} strong />
-              <InfoCell label="Объем партии" value={`${lot.volumeTons} т`} />
-              <InfoCell label="Регион и отгрузка" value={lot.region} />
-              <InfoCell label="Продавец" value={lot.sellerName} />
-              <InfoCell label="Качество" value={`Оценка ${lot.qualityScore}/100`} />
-              <InfoCell label="Дата обновления" value="Сегодня, 10:15" />
-            </div>
-            <Typography.Paragraph>{lot.description}</Typography.Paragraph>
-            <Space wrap>
-              <Tag color={hasDocs ? 'processing' : 'error'} icon={<FileTextOutlined />}>{hasDocs ? 'Документы подтверждены' : 'Документы требуют дополнения'}</Tag>
-              <Tag>{lot.hasOwnTransport ? 'Доставка продавцом' : 'Самовывоз'}</Tag>
-              <Tag>Оплата: безналичный расчет</Tag>
-            </Space>
-            <Divider />
-            <Space wrap>
-              <Button type="primary" icon={<ShoppingCartOutlined />} onClick={onAdd}>Купить</Button>
-              <Button onClick={() => navigate(`/marketplace/lot/${lot.id}`)}>Запросить условия</Button>
-              <Button icon={<HeartOutlined />}>Добавить в избранное</Button>
-              <Button>Сравнить</Button>
-            </Space>
-          </Space>
+    <Card
+      className="lot-card marketplace-lot-card marketplace-lot-card--clickable"
+      onClick={() => navigate(`/marketplace/lot/${lot.id}`)}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          navigate(`/marketplace/lot/${lot.id}`);
+        }
+      }}
+    >
+      <Row gutter={[20, 20]} align="top">
+        <Col xs={24} md={8}>
+          <div className="marketplace-lot-card__media">
+            <img src={resolveLotImage(lot)} alt={lot.title} className="marketplace-lot-card__image" />
+          </div>
         </Col>
 
-        <Col xs={24} xl={7}>
-          <Card className="auction-card">
-            <Space direction="vertical" style={{ width: '100%' }}>
-              <Typography.Text strong>Аукционный блок</Typography.Text>
-              {lot.auctionEnabled ? (
-                <>
-                  <Typography.Text>Текущая ставка: {(lot.pricePerTon + 300).toLocaleString('ru-RU')} ₽/т</Typography.Text>
-                  <Typography.Text>Шаг торгов: 50 ₽</Typography.Text>
-                  <Typography.Text>До окончания: 04:21:14</Typography.Text>
-                  <Typography.Text>Ставок: 12</Typography.Text>
-                  <AuctionBidPanel lotId={lot.id} basePrice={lot.pricePerTon} />
-                </>
-              ) : (
-                <Typography.Text type="secondary">Лот размещен в формате прямой продажи.</Typography.Text>
-              )}
+        <Col xs={24} md={16}>
+          <Space direction="vertical" size={14} style={{ width: '100%' }}>
+            <Space wrap size={8} className="marketplace-lot-card__badges">
+              <Tag color="green">{lot.grainType}</Tag>
+              <Tag color="blue">{lot.grade}</Tag>
+              <Tag color={isVerified ? 'green' : 'gold'} icon={<CheckCircleOutlined />}>
+                {isVerified ? 'Проверенный продавец' : 'Будьте осторожны, продавец не проверен'}
+              </Tag>
+              {lot.auctionEnabled && <Tag color="purple" icon={<ClockCircleOutlined />}>Аукцион</Tag>}
+              <Tag color="default">{lot.hasOwnTransport ? 'Собственная логистика' : 'Логистика по согласованию'}</Tag>
             </Space>
-          </Card>
+
+            <Typography.Title level={3} className="marketplace-lot-card__title">
+              {lot.title}
+            </Typography.Title>
+            <Typography.Paragraph className="marketplace-lot-card__description">{lot.description}</Typography.Paragraph>
+
+            <div className="marketplace-lot-card__metrics">
+              <MetricBox label="Цена за тонну" value={`${formatMoney(lot.pricePerTon)} ₽/т`} accent="green" />
+              <MetricBox label="Итого ориентир" value={`${formatMoney(total)} ₽`} accent="green" />
+              <MetricBox label="Регион и отгрузка" value={region.main} subValue={region.sub || 'Взять из карточки продавца'} accent="blue" />
+              <MetricBox label="Продавец" value={lot.sellerName} />
+              <MetricBox label="Качество" value={`${lot.qualityScore}/100`} subValue="высокий показатель" />
+              <MetricBox label="Документы" value={hasDocs ? 'Подтверждены' : 'Требуют проверки'} subValue={hasDocs ? 'ИНН · декларация · хранение' : 'Неполный пакет'} accent={hasDocs ? 'blue' : 'gold'} />
+            </div>
+
+            <Space wrap size={8} className="marketplace-lot-card__chips">
+              <Tag color="green">Натура {lot.qualityScore + 678}</Tag>
+              <Tag color="gold">Влажн. 12.5%</Tag>
+              <Tag color="blue">Протеин 14.1%</Tag>
+              <Tag>СБП / счёт</Tag>
+            </Space>
+
+            <div className="marketplace-lot-card__panels">
+              <InfoPanel title="Документы и сделка" text={hasDocs ? 'Сертификаты, декларация и договор хранения готовы.' : 'Документы загружены частично и доступны на проверку.'} />
+              <InfoPanel title="Логистика" text={lot.hasOwnTransport ? 'Самовывоз или расчёт доставки партнёром.' : 'Доставка обсуждается с продавцом и перевозчиком.'} />
+              <InfoPanel
+                title={lot.auctionEnabled ? 'Аукцион' : 'Формат сделки'}
+                text={lot.auctionEnabled ? `Шаг ${formatMoney(Math.max(100, Math.round(lot.pricePerTon * 0.015)))} ₽` : 'Прямая продажа без ожидания торгов.'}
+                highlight={lot.auctionEnabled ? `${formatMoney(auctionBid ?? lot.pricePerTon)} ₽` : undefined}
+              />
+            </div>
+
+            <Space wrap className="marketplace-lot-card__actions">
+              <Button type="primary" icon={<ShoppingCartOutlined />} onClick={(event) => { event.stopPropagation(); onStartDeal(); }}>
+                Начать сделку
+              </Button>
+              <Button icon={<PhoneOutlined />} onClick={(event) => { event.stopPropagation(); onContact(); }}>
+                Связаться с продавцом
+              </Button>
+              <Button icon={<DownloadOutlined />} onClick={(event) => { event.stopPropagation(); onDownload(); }}>
+                Документы
+              </Button>
+              <Button icon={<HeartOutlined />} onClick={(event) => { event.stopPropagation(); message.success('Лот добавлен в избранное'); }}>
+                В избранное
+              </Button>
+            </Space>
+          </Space>
         </Col>
       </Row>
     </Card>
   );
 }
 
-function EquipmentLotCard({ lot, isVerified, onAdd }: { lot: EquipmentLot; isVerified: boolean; onAdd: () => void }) {
+function EquipmentLotCard({
+  lot,
+  isVerified,
+  onContact,
+  onDownload,
+  onStartDeal,
+}: {
+  lot: EquipmentLot;
+  isVerified: boolean;
+  onContact: () => void;
+  onDownload: () => void;
+  onStartDeal: () => void;
+}) {
   const navigate = useNavigate();
+  const region = splitRegion(lot.region);
 
   return (
-    <Card className="lot-card">
-      <Row gutter={[16, 16]}>
-        <Col xs={24} xl={8}><img src={lotImageMap[lot.id]?.[0]} alt={lot.title} className="lot-image-thumb" /></Col>
-        <Col xs={24} xl={16}>
-          <Space direction="vertical" size={10} style={{ width: '100%' }}>
-            <Space wrap>
+    <Card
+      className="lot-card marketplace-lot-card marketplace-lot-card--clickable"
+      onClick={() => navigate(`/marketplace/lot/${lot.id}`)}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          navigate(`/marketplace/lot/${lot.id}`);
+        }
+      }}
+    >
+      <Row gutter={[20, 20]} align="top">
+        <Col xs={24} md={8}>
+          <div className="marketplace-lot-card__media">
+            <img src={resolveLotImage(lot)} alt={lot.title} className="marketplace-lot-card__image" />
+          </div>
+        </Col>
+
+        <Col xs={24} md={16}>
+          <Space direction="vertical" size={14} style={{ width: '100%' }}>
+            <Space wrap size={8} className="marketplace-lot-card__badges">
               <Tag color="blue">{lot.brand}</Tag>
               <Tag>{lot.year} г.</Tag>
               <Tag color={lot.condition === 'new' ? 'gold' : 'default'}>{lot.condition === 'new' ? 'Новая' : 'Б/у'}</Tag>
-              <Tag color={isVerified ? 'success' : 'warning'} icon={<CheckCircleOutlined />}>{isVerified ? 'Проверенный продавец' : 'Без проверки'}</Tag>
+              <Tag color={isVerified ? 'green' : 'gold'} icon={<CheckCircleOutlined />}>
+                {isVerified ? 'Проверенный продавец' : 'Будьте осторожны, продавец не проверен'}
+              </Tag>
             </Space>
-            <Typography.Title level={3}>{lot.title}</Typography.Title>
-            <div className="grain-grid">
-              <InfoCell label="Цена" value={`${lot.price.toLocaleString('ru-RU')} ₽`} strong />
-              <InfoCell label="Регион" value={lot.region} />
-              <InfoCell label="Продавец" value={lot.sellerName} />
-              <InfoCell label="Документы" value="ПСМ и договор в наличии" />
-              <InfoCell label="Лизинг" value="Доступен" />
-              <InfoCell label="Доставка" value="По согласованию" />
+
+            <Typography.Title level={3} className="marketplace-lot-card__title">
+              {lot.title}
+            </Typography.Title>
+            <Typography.Paragraph className="marketplace-lot-card__description">{lot.description}</Typography.Paragraph>
+
+            <div className="marketplace-lot-card__metrics">
+              <MetricBox label="Цена" value={`${formatMoney(lot.price)} ₽`} accent="green" />
+              <MetricBox label="Регион" value={region.main} subValue={region.sub || 'По согласованию'} accent="blue" />
+              <MetricBox label="Продавец" value={lot.sellerName} />
+              <MetricBox label="Документы" value="ПСМ и договор" subValue="Подтверждены" accent="blue" />
+              <MetricBox label="Лизинг" value="Доступен" subValue="Срок 12-36 мес." />
+              <MetricBox label="Доставка" value="По согласованию" subValue="Рассчитывается в сделке" />
             </div>
-            <Typography.Paragraph>{lot.description}</Typography.Paragraph>
-            <Space wrap>
-              <Button type="primary" onClick={onAdd}>Запросить предложение</Button>
-              <Button onClick={() => navigate(`/marketplace/lot/${lot.id}`)}>Открыть карточку</Button>
-              <Button icon={<HeartOutlined />}>В избранное</Button>
+
+            <Space wrap size={8} className="marketplace-lot-card__chips">
+              <Tag color="green">Гарантия</Tag>
+              <Tag color="gold">Предпродажная проверка</Tag>
+              <Tag color="blue">Документы</Tag>
+              <Tag>Безналичный расчёт</Tag>
+            </Space>
+
+            <div className="marketplace-lot-card__panels">
+              <InfoPanel title="Документы и сделка" text="ПСМ, договор и спецификация готовы к передаче." />
+              <InfoPanel title="Логистика" text="Доставка со склада, цена рассчитывается в сделке." />
+              <InfoPanel title="Состояние" text={lot.condition === 'new' ? 'Новая техника с гарантией.' : 'Проверенная техника с обслуживанием.'} />
+            </div>
+
+            <Space wrap className="marketplace-lot-card__actions">
+              <Button type="primary" icon={<ShoppingCartOutlined />} onClick={(event) => { event.stopPropagation(); onStartDeal(); }}>
+                Начать сделку
+              </Button>
+              <Button icon={<PhoneOutlined />} onClick={(event) => { event.stopPropagation(); onContact(); }}>
+                Связаться с продавцом
+              </Button>
+              <Button icon={<DownloadOutlined />} onClick={(event) => { event.stopPropagation(); onDownload(); }}>
+                Документы
+              </Button>
+              <Button icon={<HeartOutlined />} onClick={(event) => { event.stopPropagation(); message.success('Лот добавлен в избранное'); }}>
+                В избранное
+              </Button>
             </Space>
           </Space>
         </Col>
@@ -361,19 +680,215 @@ function EquipmentLotCard({ lot, isVerified, onAdd }: { lot: EquipmentLot; isVer
   );
 }
 
-function InfoCell({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
+function ServiceLotCard({
+  service,
+  onContact,
+}: {
+  service: ServiceCardData;
+  onContact: () => void;
+}) {
   return (
-    <div className="info-cell">
-      <Typography.Text type="secondary">{label}</Typography.Text>
-      <Typography.Text strong={strong}>{value}</Typography.Text>
+    <Card className="lot-card marketplace-lot-card">
+      <Row gutter={[20, 20]} align="top">
+        <Col xs={24} md={8}>
+          <div className="marketplace-lot-card__media">
+            <img src={resolveServiceImage(service.id)} alt={service.title} className="marketplace-lot-card__image" />
+          </div>
+        </Col>
+        <Col xs={24} md={16}>
+          <Space direction="vertical" size={14} style={{ width: '100%' }}>
+            <Space wrap size={8} className="marketplace-lot-card__badges">
+              <Tag color="green">{service.region}</Tag>
+              <Tag color="blue">Услуга</Tag>
+            </Space>
+            <Typography.Title level={3} className="marketplace-lot-card__title">
+              {service.title}
+            </Typography.Title>
+            <Typography.Paragraph className="marketplace-lot-card__description">{service.description}</Typography.Paragraph>
+
+            <div className="marketplace-lot-card__metrics">
+              <MetricBox label="Цена от" value={`${formatMoney(service.priceFrom)} ₽`} accent="green" />
+              <MetricBox label="Регион" value={service.region} subValue="Работаем по заявке" accent="blue" />
+              <MetricBox label="Формат" value="Консультация" subValue="Под запрос" />
+              <MetricBox label="Документы" value="Договор" subValue="После согласования" accent="gold" />
+              <MetricBox label="Срок" value="1-2 дня" subValue="В зависимости от маршрута" />
+              <MetricBox label="Связь" value="Внутренний чат" subValue="Ответ в течение дня" />
+            </div>
+
+            <Space wrap className="marketplace-lot-card__actions">
+              <Button type="primary" icon={<PhoneOutlined />} onClick={onContact}>
+                Связаться с поставщиком
+              </Button>
+              <Button icon={<HeartOutlined />} onClick={() => message.success('Услуга добавлена в избранное')}>
+                В избранное
+              </Button>
+            </Space>
+          </Space>
+        </Col>
+      </Row>
+    </Card>
+  );
+}
+
+function MetricBox({ label, value, subValue, accent }: { label: string; value: string; subValue?: string; accent?: 'green' | 'blue' | 'gold' }) {
+  return (
+    <div className={`marketplace-metric marketplace-metric--${accent ?? 'default'}`}>
+      <Typography.Text type="secondary" className="marketplace-metric__label">
+        {label}
+      </Typography.Text>
+      <Typography.Text strong className="marketplace-metric__value">
+        {value}
+      </Typography.Text>
+      {subValue && (
+        <Typography.Text type="secondary" className="marketplace-metric__sub">
+          {subValue}
+        </Typography.Text>
+      )}
     </div>
   );
 }
 
-function EmptyState({ title, actionLabel, onAction }: { title: string; actionLabel: string; onAction: () => void }) {
+function InfoPanel({ title, text, highlight }: { title: string; text: string; highlight?: string }) {
   return (
-    <Card>
-      <Empty description={title}><Button type="primary" onClick={onAction}>{actionLabel}</Button></Empty>
+    <div className="marketplace-info-panel">
+      <Typography.Text className="marketplace-info-panel__title">{title}</Typography.Text>
+      {highlight && <Typography.Text className="marketplace-info-panel__highlight">{highlight}</Typography.Text>}
+      <Typography.Text type="secondary" className="marketplace-info-panel__text">
+        {text}
+      </Typography.Text>
+    </div>
+  );
+}
+
+function FilterSwitch({ checked, onChange, label }: { checked: boolean; onChange: (value: boolean) => void; label: string }) {
+  return (
+    <Space className="marketplace-filter-switch" size={12}>
+      <Switch checked={checked} onChange={onChange} />
+      <Space direction="vertical" size={0}>
+        <Typography.Text>{label}</Typography.Text>
+        <Typography.Text type="secondary" style={{ fontSize: 13 }}>
+          Активно в фильтрах
+        </Typography.Text>
+      </Space>
+    </Space>
+  );
+}
+
+function FeatureCard({ icon, title, text }: { icon: ReactNode; title: string; text: string }) {
+  return (
+    <Card className="marketplace-feature-card">
+      <Space direction="vertical" size={10} align="center" style={{ width: '100%' }}>
+        <div className="marketplace-feature-card__icon">{icon}</div>
+        <Typography.Text strong className="marketplace-feature-card__title">
+          {title}
+        </Typography.Text>
+        <Typography.Text type="secondary" className="marketplace-feature-card__text">
+          {text}
+        </Typography.Text>
+      </Space>
     </Card>
+  );
+}
+
+function WheatIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+      <path d="M10 2v16" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M10 4c-2.2 0-3.6 1.2-4.4 3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M10 7c-2.8 0-4.8 1.6-5.7 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M10 4c2.2 0 3.6 1.2 4.4 3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M10 7c2.8 0 4.8 1.6 5.7 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function TractorIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+      <path d="M4 12h7l2-4h3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M7 8V5h3l1 3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="6" cy="14" r="2.4" stroke="currentColor" strokeWidth="1.8" />
+      <circle cx="14.5" cy="14" r="1.6" stroke="currentColor" strokeWidth="1.8" />
+    </svg>
+  );
+}
+
+function HandshakeIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+      <path d="M3 10l3-3 2 2h4l2 2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M4 12l2 2c.8.8 2 .8 2.8 0l.7-.7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M12.5 11.5l1 1c.8.8 2 .8 2.8 0l.7-.7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function ShieldIcon() {
+  return (
+    <svg width="28" height="28" viewBox="0 0 28 28" fill="none" aria-hidden="true">
+      <path d="M14 3l8 3v6c0 5.2-3.4 8.9-8 11-4.6-2.1-8-5.8-8-11V6l8-3z" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M10.5 14.3l2.3 2.3 4.8-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function DocumentIcon() {
+  return (
+    <svg width="28" height="28" viewBox="0 0 28 28" fill="none" aria-hidden="true">
+      <path d="M8 4h8l4 4v16H8V4z" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M16 4v4h4" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M10 13h8M10 17h8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function SearchGlyph() {
+  return (
+    <svg width="28" height="28" viewBox="0 0 28 28" fill="none" aria-hidden="true">
+      <circle cx="12" cy="12" r="7" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M17 17l6 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function WheatTruckIcon() {
+  return (
+    <svg width="28" height="28" viewBox="0 0 28 28" fill="none" aria-hidden="true">
+      <path d="M6 18h11l2-4h4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="10" cy="20" r="2.4" stroke="currentColor" strokeWidth="1.8" />
+      <circle cx="20" cy="20" r="1.6" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M5 6v12M3 9h4M3 12h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function GridIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+      <rect x="2" y="2" width="4" height="4" rx="1" stroke="currentColor" strokeWidth="1.4" />
+      <rect x="12" y="2" width="4" height="4" rx="1" stroke="currentColor" strokeWidth="1.4" />
+      <rect x="2" y="12" width="4" height="4" rx="1" stroke="currentColor" strokeWidth="1.4" />
+      <rect x="12" y="12" width="4" height="4" rx="1" stroke="currentColor" strokeWidth="1.4" />
+    </svg>
+  );
+}
+
+function HandshakeOutlineIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+      <path d="M3 9l2.4-2.4 1.6 1.6h3.4l1.6 1.6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M5 10.5l1.2 1.2c.6.6 1.4.6 2 0l.5-.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function AuctionIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+      <path d="M10.5 3l4.5 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      <path d="M4 14l3.5-3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      <path d="M8 6l4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      <path d="M11.5 11.5l2 2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
   );
 }

@@ -1,6 +1,6 @@
 ﻿import { CheckCircleOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import { Alert, List, Space, Tag, Typography } from 'antd';
-import { SellerDocumentInput } from '../../services/sellerService';
+import { SellerDocumentInput } from '../../types/domain';
 
 const LABELS: Record<keyof SellerDocumentInput, string> = {
   innKpp: 'ИНН/КПП',
@@ -66,5 +66,4 @@ export function SellerDocumentChecklist({ values, missingFields }: SellerDocumen
     </Space>
   );
 }
-
 

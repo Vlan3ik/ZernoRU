@@ -14,9 +14,9 @@ import {
   Tag,
   Typography,
 } from 'antd';
-import { useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { logisticsService } from '../services/logisticsService';
+import { portalApi } from '../services/portalApi';
 import { DeliveryMode } from '../types/domain';
 
 const deliveryModes: { value: DeliveryMode; label: string }[] = [
@@ -36,8 +36,22 @@ export function LogisticsPage() {
   const [deadline, setDeadline] = useState('До 3 суток');
   const [insurance, setInsurance] = useState('Да');
   const [quoteReady, setQuoteReady] = useState(false);
+  const [quote, setQuote] = useState({ price: 0, etaDays: 1 });
 
-  const quote = useMemo(() => logisticsService.calculate(distance, volume, mode), [distance, mode, volume]);
+  useEffect(() => {
+    let active = true;
+    portalApi.quote({ distanceKm: distance, volume, mode })
+      .then((result) => {
+        if (active) {
+          setQuote({ price: result.price, etaDays: result.etaDays });
+        }
+      })
+      .catch(() => undefined);
+
+    return () => {
+      active = false;
+    };
+  }, [distance, mode, volume]);
 
   return (
     <Space direction="vertical" size={24} style={{ width: '100%' }}>
@@ -191,4 +205,3 @@ export function LogisticsPage() {
     </Space>
   );
 }
-

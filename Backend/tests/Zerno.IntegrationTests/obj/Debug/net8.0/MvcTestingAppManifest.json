@@ -1,0 +1,6 @@
+{
+  "Zerno.Api, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null": "\/home\/krl\/Документы\/ZernoRU\/Backend\/src\/Zerno.Api",
+  "Zerno.Application, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null": "\/home\/krl\/Документы\/ZernoRU\/Backend\/src\/Zerno.Application",
+  "Zerno.Domain, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null": "\/home\/krl\/Документы\/ZernoRU\/Backend\/src\/Zerno.Domain",
+  "Zerno.Infrastructure, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null": "\/home\/krl\/Документы\/ZernoRU\/Backend\/src\/Zerno.Infrastructure"
+}

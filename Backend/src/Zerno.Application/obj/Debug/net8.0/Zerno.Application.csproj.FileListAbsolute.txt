@@ -1,0 +1,16 @@
+/home/krl/Документы/ZernoRU/Backend/src/Zerno.Application/bin/Debug/net8.0/Zerno.Application.deps.json
+/home/krl/Документы/ZernoRU/Backend/src/Zerno.Application/bin/Debug/net8.0/Zerno.Application.dll
+/home/krl/Документы/ZernoRU/Backend/src/Zerno.Application/bin/Debug/net8.0/Zerno.Application.pdb
+/home/krl/Документы/ZernoRU/Backend/src/Zerno.Application/bin/Debug/net8.0/Zerno.Domain.dll
+/home/krl/Документы/ZernoRU/Backend/src/Zerno.Application/bin/Debug/net8.0/Zerno.Domain.pdb
+/home/krl/Документы/ZernoRU/Backend/src/Zerno.Application/obj/Debug/net8.0/Zerno.Application.csproj.AssemblyReference.cache
+/home/krl/Документы/ZernoRU/Backend/src/Zerno.Application/obj/Debug/net8.0/Zerno.Application.GeneratedMSBuildEditorConfig.editorconfig
+/home/krl/Документы/ZernoRU/Backend/src/Zerno.Application/obj/Debug/net8.0/Zerno.Application.AssemblyInfoInputs.cache
+/home/krl/Документы/ZernoRU/Backend/src/Zerno.Application/obj/Debug/net8.0/Zerno.Application.AssemblyInfo.cs
+/home/krl/Документы/ZernoRU/Backend/src/Zerno.Application/obj/Debug/net8.0/Zerno.Application.csproj.CoreCompileInputs.cache
+/home/krl/Документы/ZernoRU/Backend/src/Zerno.Application/obj/Debug/net8.0/Zerno.Application.sourcelink.json
+/home/krl/Документы/ZernoRU/Backend/src/Zerno.Application/obj/Debug/net8.0/Zerno.Application.csproj.CopyComplete
+/home/krl/Документы/ZernoRU/Backend/src/Zerno.Application/obj/Debug/net8.0/Zerno.Application.dll
+/home/krl/Документы/ZernoRU/Backend/src/Zerno.Application/obj/Debug/net8.0/refint/Zerno.Application.dll
+/home/krl/Документы/ZernoRU/Backend/src/Zerno.Application/obj/Debug/net8.0/Zerno.Application.pdb
+/home/krl/Документы/ZernoRU/Backend/src/Zerno.Application/obj/Debug/net8.0/ref/Zerno.Application.dll

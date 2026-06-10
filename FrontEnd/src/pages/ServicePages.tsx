@@ -32,7 +32,6 @@ import {
 import dayjs from 'dayjs';
 import { useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { priceRows } from '../data/portalContent';
 import { useAppStore } from '../store/appStore';
 
 export function CartPage() {
@@ -586,13 +585,15 @@ export function ContentArticlePage({ title, sections }: ContentArticlePageProps)
 }
 
 export function PriceArchivePage() {
+  const prices = useAppStore((state) => state.prices);
+
   return (
     <Space direction="vertical" size={24} style={{ width: '100%' }}>
       <Card className="section-card"><Typography.Title level={1}>Архив цен</Typography.Title></Card>
       <Card title="Параметры архива">
         <Row gutter={12}>
           <Col xs={24} md={6}><Select placeholder="Год" options={[{ value: '2026', label: '2026' }, { value: '2025', label: '2025' }]} /></Col>
-          <Col xs={24} md={6}><Select placeholder="Культура" options={priceRows.map((item) => ({ value: item.key, label: item.culture }))} /></Col>
+          <Col xs={24} md={6}><Select placeholder="Культура" options={prices.map((item) => ({ value: item.id, label: item.culture }))} /></Col>
           <Col xs={24} md={6}><Select placeholder="Период" options={[{ value: 'week', label: 'Недели' }, { value: 'month', label: 'Месяцы' }]} /></Col>
           <Col xs={24} md={6}><Button block>Сравнить периоды</Button></Col>
         </Row>

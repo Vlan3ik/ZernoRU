@@ -1,16 +1,33 @@
-﻿import { describe, expect, it, beforeEach } from 'vitest';
-import { bootstrapData } from '../services/bootstrapService';
+import { describe, expect, it, beforeEach } from 'vitest';
+import {
+  seedEquipmentLots,
+  seedForumPosts,
+  seedForumReplies,
+  seedGrainLots,
+  seedNotifications,
+  seedSellerApplications,
+  seedUsers,
+} from '../data/seedData';
 import { useAppStore } from '../store/appStore';
 
 describe('app store bootstrap integration', () => {
   beforeEach(() => {
-    localStorage.clear();
-    bootstrapData();
-    useAppStore.setState({ currentUserId: 'u_buyer_1' });
-    useAppStore.getState().loadAll();
+    useAppStore.setState({
+      users: seedUsers,
+      currentUserId: 'u_buyer_1',
+      grainLots: seedGrainLots,
+      equipmentLots: seedEquipmentLots,
+      posts: seedForumPosts,
+      replies: seedForumReplies,
+      notifications: seedNotifications,
+      sellerApplications: seedSellerApplications,
+      cart: [],
+      orders: [],
+      subscription: { isActive: false, plan: null, expiresAt: null },
+    });
   });
 
-  it('loads seeded entities into zustand store', () => {
+  it('stores seeded entities in zustand state', () => {
     const state = useAppStore.getState();
 
     expect(state.users.length).toBeGreaterThan(0);
@@ -18,16 +35,4 @@ describe('app store bootstrap integration', () => {
     expect(state.equipmentLots.length).toBeGreaterThan(0);
     expect(state.posts.length).toBeGreaterThan(0);
   });
-
-  it('changes current user and reloads dependent slices', () => {
-    const initialUserId = useAppStore.getState().currentUserId;
-    expect(initialUserId).toBe('u_buyer_1');
-
-    useAppStore.getState().setCurrentUser('u_seller_1');
-    const nextState = useAppStore.getState();
-
-    expect(nextState.currentUserId).toBe('u_seller_1');
-    expect(nextState.notifications.every((item) => item.userId === 'u_seller_1')).toBe(true);
-  });
 });
-

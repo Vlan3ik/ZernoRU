@@ -1,7 +1,7 @@
 ﻿import { CheckCircleOutlined, ClockCircleOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import { Empty, Space, Tag, Timeline, Typography } from 'antd';
 import dayjs from 'dayjs';
-import { SellerActivityItem } from '../../services/sellerService';
+import { SellerActivityItem } from '../../types/domain';
 
 interface SellerActivityFeedProps {
   items: SellerActivityItem[];
@@ -51,5 +51,4 @@ export function SellerActivityFeed({ items, limit = 10 }: SellerActivityFeedProp
     />
   );
 }
-
 

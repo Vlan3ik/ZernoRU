@@ -21,13 +21,13 @@ export function CartDrawer({ trigger }: Props) {
 
   const total = useMemo(() => cart.reduce((sum, item) => sum + item.subtotal, 0) + deliveryPrice, [cart, deliveryPrice]);
 
-  const handleCheckout = () => {
+  const handleCheckout = async () => {
     if (!cart.length) {
       message.warning('Корзина пуста');
       return;
     }
 
-    const order = checkout(payment, deliveryMode, deliveryPrice);
+    const order = await checkout(payment, deliveryMode, deliveryPrice);
     message.success(`Заказ ${order.id} создан на сумму ${order.total.toLocaleString('ru-RU')} ₽`);
     setOpen(false);
   };

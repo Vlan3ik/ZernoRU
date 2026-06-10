@@ -1,0 +1,296 @@
+{
+  "format": 1,
+  "restore": {
+    "/home/krl/Документы/ZernoRU/Backend/src/Zerno.Api/Zerno.Api.csproj": {}
+  },
+  "projects": {
+    "/home/krl/Документы/ZernoRU/Backend/src/Zerno.Api/Zerno.Api.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "/home/krl/Документы/ZernoRU/Backend/src/Zerno.Api/Zerno.Api.csproj",
+        "projectName": "Zerno.Api",
+        "projectPath": "/home/krl/Документы/ZernoRU/Backend/src/Zerno.Api/Zerno.Api.csproj",
+        "packagesPath": "/home/krl/.nuget/packages/",
+        "outputPath": "/home/krl/Документы/ZernoRU/Backend/src/Zerno.Api/obj/",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "/home/krl/.nuget/NuGet/NuGet.Config"
+        ],
+        "originalTargetFrameworks": [
+          "net8.0"
+        ],
+        "sources": {
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net8.0": {
+            "targetAlias": "net8.0",
+            "projectReferences": {
+              "/home/krl/Документы/ZernoRU/Backend/src/Zerno.Application/Zerno.Application.csproj": {
+                "projectPath": "/home/krl/Документы/ZernoRU/Backend/src/Zerno.Application/Zerno.Application.csproj"
+              },
+              "/home/krl/Документы/ZernoRU/Backend/src/Zerno.Infrastructure/Zerno.Infrastructure.csproj": {
+                "projectPath": "/home/krl/Документы/ZernoRU/Backend/src/Zerno.Infrastructure/Zerno.Infrastructure.csproj"
+              }
+            }
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        }
+      },
+      "frameworks": {
+        "net8.0": {
+          "targetAlias": "net8.0",
+          "dependencies": {
+            "BCrypt.Net-Next": {
+              "target": "Package",
+              "version": "[4.0.3, )"
+            },
+            "Microsoft.AspNetCore.Authentication.JwtBearer": {
+              "target": "Package",
+              "version": "[8.0.11, )"
+            },
+            "Microsoft.AspNetCore.OpenApi": {
+              "target": "Package",
+              "version": "[8.0.27, )"
+            },
+            "Microsoft.EntityFrameworkCore.Design": {
+              "include": "Runtime, Build, Native, ContentFiles, Analyzers, BuildTransitive",
+              "suppressParent": "All",
+              "target": "Package",
+              "version": "[8.0.11, )"
+            },
+            "Swashbuckle.AspNetCore": {
+              "target": "Package",
+              "version": "[6.6.2, )"
+            }
+          },
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "frameworkReferences": {
+            "Microsoft.AspNetCore.App": {
+              "privateAssets": "none"
+            },
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "/usr/lib64/dotnet/sdk/8.0.127/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    },
+    "/home/krl/Документы/ZernoRU/Backend/src/Zerno.Application/Zerno.Application.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "/home/krl/Документы/ZernoRU/Backend/src/Zerno.Application/Zerno.Application.csproj",
+        "projectName": "Zerno.Application",
+        "projectPath": "/home/krl/Документы/ZernoRU/Backend/src/Zerno.Application/Zerno.Application.csproj",
+        "packagesPath": "/home/krl/.nuget/packages/",
+        "outputPath": "/home/krl/Документы/ZernoRU/Backend/src/Zerno.Application/obj/",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "/home/krl/.nuget/NuGet/NuGet.Config"
+        ],
+        "originalTargetFrameworks": [
+          "net8.0"
+        ],
+        "sources": {
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net8.0": {
+            "targetAlias": "net8.0",
+            "projectReferences": {
+              "/home/krl/Документы/ZernoRU/Backend/src/Zerno.Domain/Zerno.Domain.csproj": {
+                "projectPath": "/home/krl/Документы/ZernoRU/Backend/src/Zerno.Domain/Zerno.Domain.csproj"
+              }
+            }
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        }
+      },
+      "frameworks": {
+        "net8.0": {
+          "targetAlias": "net8.0",
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "frameworkReferences": {
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "/usr/lib64/dotnet/sdk/8.0.127/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    },
+    "/home/krl/Документы/ZernoRU/Backend/src/Zerno.Domain/Zerno.Domain.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "/home/krl/Документы/ZernoRU/Backend/src/Zerno.Domain/Zerno.Domain.csproj",
+        "projectName": "Zerno.Domain",
+        "projectPath": "/home/krl/Документы/ZernoRU/Backend/src/Zerno.Domain/Zerno.Domain.csproj",
+        "packagesPath": "/home/krl/.nuget/packages/",
+        "outputPath": "/home/krl/Документы/ZernoRU/Backend/src/Zerno.Domain/obj/",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "/home/krl/.nuget/NuGet/NuGet.Config"
+        ],
+        "originalTargetFrameworks": [
+          "net8.0"
+        ],
+        "sources": {
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net8.0": {
+            "targetAlias": "net8.0",
+            "projectReferences": {}
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        }
+      },
+      "frameworks": {
+        "net8.0": {
+          "targetAlias": "net8.0",
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "frameworkReferences": {
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "/usr/lib64/dotnet/sdk/8.0.127/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    },
+    "/home/krl/Документы/ZernoRU/Backend/src/Zerno.Infrastructure/Zerno.Infrastructure.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "/home/krl/Документы/ZernoRU/Backend/src/Zerno.Infrastructure/Zerno.Infrastructure.csproj",
+        "projectName": "Zerno.Infrastructure",
+        "projectPath": "/home/krl/Документы/ZernoRU/Backend/src/Zerno.Infrastructure/Zerno.Infrastructure.csproj",
+        "packagesPath": "/home/krl/.nuget/packages/",
+        "outputPath": "/home/krl/Документы/ZernoRU/Backend/src/Zerno.Infrastructure/obj/",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "/home/krl/.nuget/NuGet/NuGet.Config"
+        ],
+        "originalTargetFrameworks": [
+          "net8.0"
+        ],
+        "sources": {
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net8.0": {
+            "targetAlias": "net8.0",
+            "projectReferences": {
+              "/home/krl/Документы/ZernoRU/Backend/src/Zerno.Application/Zerno.Application.csproj": {
+                "projectPath": "/home/krl/Документы/ZernoRU/Backend/src/Zerno.Application/Zerno.Application.csproj"
+              },
+              "/home/krl/Документы/ZernoRU/Backend/src/Zerno.Domain/Zerno.Domain.csproj": {
+                "projectPath": "/home/krl/Документы/ZernoRU/Backend/src/Zerno.Domain/Zerno.Domain.csproj"
+              }
+            }
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        }
+      },
+      "frameworks": {
+        "net8.0": {
+          "targetAlias": "net8.0",
+          "dependencies": {
+            "BCrypt.Net-Next": {
+              "target": "Package",
+              "version": "[4.0.3, )"
+            },
+            "Microsoft.EntityFrameworkCore": {
+              "target": "Package",
+              "version": "[8.0.11, )"
+            },
+            "Microsoft.EntityFrameworkCore.Design": {
+              "include": "Runtime, Build, Native, ContentFiles, Analyzers, BuildTransitive",
+              "suppressParent": "All",
+              "target": "Package",
+              "version": "[8.0.11, )"
+            },
+            "Minio": {
+              "target": "Package",
+              "version": "[6.0.4, )"
+            },
+            "Npgsql.EntityFrameworkCore.PostgreSQL": {
+              "target": "Package",
+              "version": "[8.0.11, )"
+            },
+            "System.IdentityModel.Tokens.Jwt": {
+              "target": "Package",
+              "version": "[7.1.2, )"
+            }
+          },
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "frameworkReferences": {
+            "Microsoft.AspNetCore.App": {
+              "privateAssets": "none"
+            },
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "/usr/lib64/dotnet/sdk/8.0.127/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    }
+  }
+}

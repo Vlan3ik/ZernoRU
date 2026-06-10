@@ -1,11 +1,12 @@
 ﻿import { Button, Card, Col, Descriptions, Empty, Input, Row, Select, Space, Table, Tag, Typography } from 'antd';
 import { useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { newsFeed, priceRows } from '../data/portalContent';
 import { directoryData } from '../data/directoriesData';
+import { useAppStore } from '../store/appStore';
 
 export function CountryDetailPage() {
   const { slug = 'russia' } = useParams();
+  const news = useAppStore((state) => state.news);
   const nameMap: Record<string, string> = {
     russia: 'Россия',
     kazakhstan: 'Казахстан',
@@ -37,7 +38,7 @@ export function CountryDetailPage() {
             </Descriptions>
           </Card>
           <Card title="Новости страны" style={{ marginTop: 16 }}>
-            {newsFeed.slice(0, 3).map((item) => (
+            {news.filter((item) => item.country === country).slice(0, 3).map((item) => (
               <Card key={item.id} className="nested-card" style={{ marginBottom: 8 }}>
                 <Typography.Text strong>{item.title}</Typography.Text>
               </Card>
@@ -60,6 +61,8 @@ export function CountryDetailPage() {
 
 export function CultureDetailPage() {
   const { slug = 'wheat' } = useParams();
+  const prices = useAppStore((state) => state.prices);
+  const news = useAppStore((state) => state.news);
   const titleMap: Record<string, string> = {
     grain: 'Зерновые',
     wheat: 'Пшеница',
@@ -80,10 +83,10 @@ export function CultureDetailPage() {
       <Row gutter={[16, 16]}>
         <Col xs={24} xl={16}>
           <Card title="Цена и география">
-            <Table rowKey="key" pagination={false} dataSource={priceRows} columns={[{ title: 'Регион', dataIndex: 'region', key: 'region' }, { title: 'Цена', dataIndex: 'day', key: 'day', render: (v: number) => `${v.toLocaleString('ru-RU')} ₽/т` }, { title: 'Порт', dataIndex: 'port', key: 'port' }]} />
+            <Table rowKey="id" pagination={false} dataSource={prices.filter((item) => culture === 'Зерновые' || item.culture.toLowerCase().includes(culture.toLowerCase()))} columns={[{ title: 'Регион', dataIndex: 'region', key: 'region' }, { title: 'Цена', dataIndex: 'day', key: 'day', render: (v: number) => `${v.toLocaleString('ru-RU')} ₽/т` }]} />
           </Card>
           <Card title="Новости и аналитика" style={{ marginTop: 16 }}>
-            {newsFeed.slice(0, 2).map((item) => (
+            {news.filter((item) => item.culture === culture || item.section === 'Аналитика').slice(0, 2).map((item) => (
               <Card key={item.id} className="nested-card" style={{ marginBottom: 8 }}>
                 <Typography.Text strong>{item.title}</Typography.Text>
               </Card>

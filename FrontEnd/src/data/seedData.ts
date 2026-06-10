@@ -16,6 +16,7 @@ const now = new Date().toISOString();
 export const seedUsers: UserProfile[] = [
   {
     id: 'u_buyer_1',
+    email: 'buyer1@zerno.local',
     name: 'ООО СмолАгроЗакуп',
     role: 'buyer',
     region: 'Смоленская область',
@@ -23,6 +24,7 @@ export const seedUsers: UserProfile[] = [
   },
   {
     id: 'u_seller_1',
+    email: 'seller1@zerno.local',
     name: 'КФХ Вяземские Поля',
     role: 'seller',
     region: 'Смоленская область',
@@ -33,6 +35,7 @@ export const seedUsers: UserProfile[] = [
   },
   {
     id: 'u_seller_2',
+    email: 'seller2@zerno.local',
     name: 'ИП АгроТехСнаб',
     role: 'seller',
     region: 'Смоленская область',
@@ -217,5 +220,4 @@ export const defaultSubscription: SubscriptionState = {
   plan: null,
   expiresAt: null,
 };
-
 
