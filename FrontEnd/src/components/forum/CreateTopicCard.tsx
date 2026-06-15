@@ -1,4 +1,6 @@
-﻿import { Button, Card, Form, Input, Segmented, message } from 'antd';
+﻿import { UploadOutlined } from '@ant-design/icons';
+import { Button, Card, Form, Input, Segmented, Space, Tag, message } from 'antd';
+import { useRef, useState } from 'react';
 import { UserProfile, ForumPost } from '../../types/domain';
 
 interface CreateTopicFormValues {
@@ -6,7 +8,6 @@ interface CreateTopicFormValues {
   title: string;
   content: string;
   tags: string;
-  mediaUrl?: string;
 }
 
 interface CreateTopicCardProps {
@@ -24,6 +25,8 @@ function normalizeTags(rawTags: string): string[] {
 
 export function CreateTopicCard({ currentUser, onCreate }: CreateTopicCardProps) {
   const [form] = Form.useForm<CreateTopicFormValues>();
+  const [attachment, setAttachment] = useState<{ url: string; name: string } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   return (
     <Card title="Создать тему">
@@ -38,11 +41,12 @@ export function CreateTopicCard({ currentUser, onCreate }: CreateTopicCardProps)
             authorName: currentUser.name,
             title: values.title.trim(),
             content: values.content.trim(),
-            mediaUrl: values.mediaUrl?.trim() || undefined,
+            mediaUrl: attachment?.url,
             tags: normalizeTags(values.tags),
           });
 
           form.resetFields();
+          setAttachment(null);
           form.setFieldValue('section', 'Агрономия');
           message.success('Тема опубликована');
         }}
@@ -63,9 +67,26 @@ export function CreateTopicCard({ currentUser, onCreate }: CreateTopicCardProps)
         >
           <Input placeholder="#смоленск #пшеница" />
         </Form.Item>
-        <Form.Item name="mediaUrl" label="Фото/видео URL (необязательно)">
-          <Input placeholder="https://..." />
-        </Form.Item>
+        <Space wrap style={{ marginBottom: 12 }}>
+          <Button icon={<UploadOutlined />} onClick={() => fileInputRef.current?.click()}>
+            Прикрепить файл
+          </Button>
+          {attachment && <Tag closable onClose={() => setAttachment(null)}>{attachment.name}</Tag>}
+        </Space>
+        <input
+          ref={fileInputRef}
+          type="file"
+          className="forum-hidden-input"
+          accept="image/*,video/*,application/pdf,.doc,.docx,.xls,.xlsx"
+          onChange={async (event) => {
+            const file = event.target.files?.[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = () => setAttachment({ url: String(reader.result ?? ''), name: file.name });
+            reader.readAsDataURL(file);
+            event.target.value = '';
+          }}
+        />
         <Button type="primary" htmlType="submit">
           Опубликовать
         </Button>
@@ -73,4 +94,3 @@ export function CreateTopicCard({ currentUser, onCreate }: CreateTopicCardProps)
     </Card>
   );
 }
-

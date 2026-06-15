@@ -44,6 +44,129 @@ public sealed class MarketplaceService(AppDbContext dbContext) : IMarketplaceSer
                 equipment.Brand, equipment.Year, equipment.Condition.ToString(), equipment.CreatedAtUtc.ToString("O"));
     }
 
+    public async Task<IReadOnlyList<AuctionSummaryDto>> GetAuctionSummariesAsync(CancellationToken cancellationToken)
+    {
+        var auctions = await dbContext.AuctionLots
+            .Include(x => x.Bids)
+            .OrderByDescending(x => x.CreatedAtUtc)
+            .ToListAsync(cancellationToken);
+
+        var lotTitles = await ResolveAuctionLotTitlesAsync(auctions.Select(x => x.LotId), cancellationToken);
+        var lotOwners = await ResolveAuctionLotOwnersAsync(auctions.Select(x => x.LotId), cancellationToken);
+
+        foreach (var auction in auctions.Where(x => x.Status == AuctionStatus.Active && DateTime.UtcNow >= x.EndsAtUtc))
+        {
+            await RefreshAuctionStateAsync(auction, cancellationToken, forceEnd: true);
+        }
+
+        return auctions.Select(auction => ToAuctionSummaryDto(
+            auction,
+            lotTitles.GetValueOrDefault(auction.LotId) ?? string.Empty,
+            lotOwners.GetValueOrDefault(auction.LotId) ?? string.Empty)).ToList();
+    }
+
+    public async Task<AuctionSummaryDto?> GetAuctionAsync(Guid lotId, CancellationToken cancellationToken)
+    {
+        var auction = await EnsureAuctionAsync(lotId, cancellationToken);
+        if (auction is null)
+        {
+            return null;
+        }
+
+        await RefreshAuctionStateAsync(auction, cancellationToken);
+        var lot = await GetLotEntityAsync(lotId, cancellationToken);
+        return lot is null ? null : ToAuctionSummaryDto(auction, lot.Title, lot.SellerName);
+    }
+
+    public async Task<IReadOnlyList<AuctionBidDto>> GetAuctionBidsAsync(Guid lotId, CancellationToken cancellationToken)
+    {
+        var auction = await EnsureAuctionAsync(lotId, cancellationToken);
+        if (auction is null)
+        {
+            return Array.Empty<AuctionBidDto>();
+        }
+
+        await RefreshAuctionStateAsync(auction, cancellationToken);
+        return auction.Bids
+            .OrderByDescending(x => x.CreatedAtUtc)
+            .Select(x => new AuctionBidDto(
+                x.Id,
+                x.AuctionLotId,
+                x.UserId,
+                x.UserName,
+                x.Amount,
+                x.CreatedAtUtc.ToString("O"),
+                x.IsWinning))
+            .ToList();
+    }
+
+    public async Task<AuctionSummaryDto> PlaceAuctionBidAsync(Guid userId, Guid lotId, PlaceAuctionBidRequestDto request, CancellationToken cancellationToken)
+    {
+        var lot = await GetLotEntityAsync(lotId, cancellationToken) as GrainLot
+            ?? throw new InvalidOperationException("Аукцион доступен только для зернового лота.");
+
+        if (!lot.AuctionEnabled)
+        {
+            throw new InvalidOperationException("Для этого лота аукцион не включен.");
+        }
+
+        var auction = await EnsureAuctionAsync(lotId, cancellationToken)
+            ?? throw new InvalidOperationException("Аукцион не найден.");
+
+        await RefreshAuctionStateAsync(auction, cancellationToken);
+        if (auction.Status != AuctionStatus.Active)
+        {
+            throw new InvalidOperationException("Аукцион уже завершен.");
+        }
+
+        if (DateTime.UtcNow >= auction.EndsAtUtc)
+        {
+            await RefreshAuctionStateAsync(auction, cancellationToken, forceEnd: true);
+            throw new InvalidOperationException("Аукцион уже завершен.");
+        }
+
+        var user = await dbContext.Users.FirstOrDefaultAsync(x => x.Id == userId, cancellationToken)
+            ?? throw new InvalidOperationException("Пользователь не найден.");
+
+        var currentHighest = auction.Bids.Count == 0 ? auction.StartingPrice : auction.CurrentHighestBid;
+        var minAllowed = currentHighest + auction.MinimumStep;
+        if (request.Amount < minAllowed)
+        {
+            throw new InvalidOperationException($"Минимальная следующая ставка: {minAllowed:N0} ₽/т.");
+        }
+
+        var bid = new AuctionBid
+        {
+            Id = Guid.NewGuid(),
+            AuctionLotId = auction.Id,
+            UserId = user.Id,
+            UserName = user.DisplayName,
+            Amount = request.Amount,
+            IsWinning = true,
+            CreatedAtUtc = DateTime.UtcNow
+        };
+
+        foreach (var existing in auction.Bids)
+        {
+            existing.IsWinning = false;
+        }
+
+        dbContext.AuctionBids.Add(bid);
+        auction.CurrentHighestBid = bid.Amount;
+        auction.LeadingUserId = user.Id;
+        auction.LeadingUserName = user.DisplayName;
+        auction.WinningBidId = null;
+        auction.WinningUserId = null;
+        auction.WinningUserName = null;
+        auction.Status = AuctionStatus.Active;
+        auction.UpdatedAtUtc = DateTime.UtcNow;
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        var summary = ToAuctionSummaryDto(auction, lot.Title, lot.SellerName);
+        return summary;
+    }
+
     public async Task<Guid> CreateGrainLotAsync(CreateGrainLotRequestDto request, CancellationToken cancellationToken)
     {
         var lot = new GrainLot
@@ -78,6 +201,12 @@ public sealed class MarketplaceService(AppDbContext dbContext) : IMarketplaceSer
             Message = $"Лот \"{request.Title}\" опубликован.",
             CreatedAtUtc = DateTime.UtcNow
         });
+
+        if (request.AuctionEnabled)
+        {
+            dbContext.AuctionLots.Add(CreateAuctionLot(lot));
+        }
+
         await dbContext.SaveChangesAsync(cancellationToken);
         return lot.Id;
     }
@@ -177,6 +306,9 @@ public sealed class MarketplaceService(AppDbContext dbContext) : IMarketplaceSer
             throw new InvalidOperationException("Корзина пуста.");
         }
 
+        var buyer = await dbContext.Users.FirstOrDefaultAsync(x => x.Id == userId, cancellationToken);
+        var lotSellers = await ResolveLotSellersAsync(items.Select(x => x.LotId), cancellationToken);
+
         var orderItems = items.Select(x => new CartItem
         {
             Id = x.Id,
@@ -190,7 +322,7 @@ public sealed class MarketplaceService(AppDbContext dbContext) : IMarketplaceSer
             CreatedAtUtc = x.CreatedAtUtc
         }).ToList();
 
-        var total = orderItems.Sum(x => x.UnitPrice * x.Quantity) + request.DeliveryPrice;
+        var total = orderItems.Sum(x => x.UnitPrice * x.Quantity);
         var order = new Order
         {
             Id = Guid.NewGuid(),
@@ -209,7 +341,7 @@ public sealed class MarketplaceService(AppDbContext dbContext) : IMarketplaceSer
             }).ToList(),
             PaymentMethod = Enum.Parse<PaymentMethod>(Normalize(request.PaymentMethod), true),
             DeliveryMode = Enum.Parse<DeliveryMode>(Normalize(request.DeliveryMode), true),
-            DeliveryPrice = request.DeliveryPrice,
+            DeliveryPrice = 0,
             Total = total,
             Status = OrderStatus.Created,
             CreatedAtUtc = DateTime.UtcNow
@@ -220,19 +352,89 @@ public sealed class MarketplaceService(AppDbContext dbContext) : IMarketplaceSer
         {
             item.OrderId = order.Id;
         }
+
+        var shortId = order.Id.ToString("N")[..8];
+        dbContext.Notifications.Add(new Domain.Notifications.NotificationItem
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            Message = $"Заказ {shortId} создан. Продавцу отправлено уведомление о новой сделке.",
+            CreatedAtUtc = DateTime.UtcNow
+        });
+
+        var sellerIds = order.Items
+            .Where(item => lotSellers.ContainsKey(item.LotId))
+            .Select(item => lotSellers[item.LotId].SellerId)
+            .Distinct()
+            .ToList();
+
+        foreach (var sellerId in sellerIds)
+        {
+            var sellerItems = order.Items
+                .Where(item => lotSellers.TryGetValue(item.LotId, out var seller) && seller.SellerId == sellerId)
+                .ToList();
+            var sellerTotal = sellerItems.Sum(item => item.UnitPrice * item.Quantity);
+            dbContext.Notifications.Add(new Domain.Notifications.NotificationItem
+            {
+                Id = Guid.NewGuid(),
+                UserId = sellerId,
+                Message = $"Новая сделка {shortId}: {sellerItems.Count} поз. на {sellerTotal:N0} ₽ от {buyer?.DisplayName ?? "покупателя"}.",
+                CreatedAtUtc = DateTime.UtcNow
+            });
+        }
+
         dbContext.CartItems.RemoveRange(items);
         await dbContext.SaveChangesAsync(cancellationToken);
         return ToOrderDto(order);
     }
 
-    public async Task<IReadOnlyList<OrderDto>> GetOrdersAsync(Guid userId, CancellationToken cancellationToken) =>
-        (await dbContext.Orders
-            .Include(x => x.Items)
-            .Where(x => x.UserId == userId)
-            .OrderByDescending(x => x.CreatedAtUtc)
-            .ToListAsync(cancellationToken))
-        .Select(ToOrderDto)
-        .ToList();
+    public async Task<IReadOnlyList<OrderDto>> GetOrdersAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        var ownedGrainLotIds = await dbContext.GrainLots
+            .Where(x => x.SellerId == userId)
+            .Select(x => x.Id)
+            .ToListAsync(cancellationToken);
+        var ownedEquipmentLotIds = await dbContext.EquipmentLots
+            .Where(x => x.SellerId == userId)
+            .Select(x => x.Id)
+            .ToListAsync(cancellationToken);
+        var ownedLotIds = ownedGrainLotIds.Concat(ownedEquipmentLotIds).ToHashSet();
+
+        return (await dbContext.Orders
+                .Include(x => x.Items)
+                .OrderByDescending(x => x.CreatedAtUtc)
+                .ToListAsync(cancellationToken))
+            .Where(order => order.UserId == userId || order.Items.Any(item => ownedLotIds.Contains(item.LotId)))
+            .Select(ToOrderDto)
+            .ToList();
+    }
+
+
+    private async Task<Dictionary<Guid, (Guid SellerId, string SellerName, string Title)>> ResolveLotSellersAsync(IEnumerable<Guid> lotIds, CancellationToken cancellationToken)
+    {
+        var ids = lotIds.Distinct().ToArray();
+        var result = new Dictionary<Guid, (Guid SellerId, string SellerName, string Title)>();
+
+        var grain = await dbContext.GrainLots
+            .Where(x => ids.Contains(x.Id))
+            .Select(x => new { x.Id, x.SellerId, x.SellerName, x.Title })
+            .ToListAsync(cancellationToken);
+        foreach (var lot in grain)
+        {
+            result[lot.Id] = (lot.SellerId, lot.SellerName, lot.Title);
+        }
+
+        var equipment = await dbContext.EquipmentLots
+            .Where(x => ids.Contains(x.Id))
+            .Select(x => new { x.Id, x.SellerId, x.SellerName, x.Title })
+            .ToListAsync(cancellationToken);
+        foreach (var lot in equipment)
+        {
+            result[lot.Id] = (lot.SellerId, lot.SellerName, lot.Title);
+        }
+
+        return result;
+    }
 
     private async Task<MarketplaceLot?> GetLotEntityAsync(Guid lotId, CancellationToken cancellationToken)
     {
@@ -245,8 +447,167 @@ public sealed class MarketplaceService(AppDbContext dbContext) : IMarketplaceSer
         return await dbContext.EquipmentLots.FirstOrDefaultAsync(x => x.Id == lotId, cancellationToken);
     }
 
-    private static string Normalize(string value) =>
-        value.Trim().Replace("-", "_").Replace(" ", "_");
+    private async Task<AuctionLot?> EnsureAuctionAsync(Guid lotId, CancellationToken cancellationToken)
+    {
+        var auction = await dbContext.AuctionLots.Include(x => x.Bids).FirstOrDefaultAsync(x => x.LotId == lotId, cancellationToken);
+        if (auction is not null)
+        {
+            return auction;
+        }
+
+        var lot = await dbContext.GrainLots.FirstOrDefaultAsync(x => x.Id == lotId, cancellationToken);
+        if (lot is null || !lot.AuctionEnabled)
+        {
+            return null;
+        }
+
+        auction = CreateAuctionLot(lot);
+        dbContext.AuctionLots.Add(auction);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return await dbContext.AuctionLots.Include(x => x.Bids).FirstAsync(x => x.Id == auction.Id, cancellationToken);
+    }
+
+    private static AuctionLot CreateAuctionLot(GrainLot lot)
+    {
+        var step = Math.Max(100m, Math.Round(lot.PricePerTon * 0.005m, 0, MidpointRounding.AwayFromZero));
+        var now = DateTime.UtcNow;
+        return new AuctionLot
+        {
+            Id = Guid.NewGuid(),
+            LotId = lot.Id,
+            StartingPrice = lot.PricePerTon,
+            MinimumStep = step,
+            CurrentHighestBid = lot.PricePerTon,
+            StartsAtUtc = now.AddHours(-1),
+            EndsAtUtc = now.AddHours(6),
+            Status = AuctionStatus.Active,
+            CreatedAtUtc = now
+        };
+    }
+
+    private async Task RefreshAuctionStateAsync(AuctionLot auction, CancellationToken cancellationToken, bool forceEnd = false)
+    {
+        if (auction.Status != AuctionStatus.Active)
+        {
+            return;
+        }
+
+        if (!forceEnd && DateTime.UtcNow < auction.EndsAtUtc)
+        {
+            return;
+        }
+
+        if (auction.Bids.Count == 0)
+        {
+            auction.CurrentHighestBid = auction.StartingPrice;
+            auction.LeadingUserId = null;
+            auction.LeadingUserName = null;
+            auction.WinningBidId = null;
+            auction.WinningUserId = null;
+            auction.WinningUserName = null;
+        }
+        else
+        {
+            var winner = auction.Bids.OrderByDescending(x => x.Amount).ThenByDescending(x => x.CreatedAtUtc).First();
+            foreach (var bid in auction.Bids)
+            {
+                bid.IsWinning = bid.Id == winner.Id;
+            }
+
+            auction.CurrentHighestBid = winner.Amount;
+            auction.LeadingUserId = winner.UserId;
+            auction.LeadingUserName = winner.UserName;
+            auction.WinningBidId = winner.Id;
+            auction.WinningUserId = winner.UserId;
+            auction.WinningUserName = winner.UserName;
+        }
+
+        auction.Status = AuctionStatus.Ended;
+        auction.UpdatedAtUtc = DateTime.UtcNow;
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task<Dictionary<Guid, string>> ResolveAuctionLotTitlesAsync(IEnumerable<Guid> lotIds, CancellationToken cancellationToken)
+    {
+        var ids = lotIds.Distinct().ToArray();
+        return await dbContext.GrainLots
+            .Where(x => ids.Contains(x.Id))
+            .ToDictionaryAsync(x => x.Id, x => x.Title, cancellationToken);
+    }
+
+    private async Task<Dictionary<Guid, string>> ResolveAuctionLotOwnersAsync(IEnumerable<Guid> lotIds, CancellationToken cancellationToken)
+    {
+        var ids = lotIds.Distinct().ToArray();
+        return await dbContext.GrainLots
+            .Where(x => ids.Contains(x.Id))
+            .ToDictionaryAsync(x => x.Id, x => x.SellerName, cancellationToken);
+    }
+
+    private static AuctionSummaryDto ToAuctionSummaryDto(AuctionLot auction, string lotTitle, string sellerName)
+    {
+        var lastBid = auction.Bids.OrderByDescending(x => x.CreatedAtUtc).FirstOrDefault();
+        return new AuctionSummaryDto(
+            auction.LotId,
+            lotTitle,
+            auction.StartingPrice,
+            auction.CurrentHighestBid,
+            auction.MinimumStep,
+            sellerName,
+            auction.StartsAtUtc.ToString("O"),
+            auction.EndsAtUtc.ToString("O"),
+            auction.Status.ToString(),
+            auction.Bids.Count,
+            auction.LeadingUserId,
+            auction.LeadingUserName,
+            auction.WinningUserId,
+            auction.WinningUserName,
+            auction.WinningBidId,
+            lastBid?.CreatedAtUtc.ToString("O"),
+            auction.Status == AuctionStatus.Ended);
+    }
+
+    private static string Normalize(string value)
+    {
+        var normalized = value.Trim();
+        var lower = normalized.ToLowerInvariant();
+
+        return lower switch
+        {
+            "пшеница" => nameof(GrainType.Wheat),
+            "ячмень" => nameof(GrainType.Barley),
+            "кукуруза" => nameof(GrainType.Corn),
+            "рожь" => nameof(GrainType.Rye),
+            "овес" => nameof(GrainType.Oats),
+            "овёс" => nameof(GrainType.Oats),
+            "new" => nameof(EquipmentCondition.New),
+            "used" => nameof(EquipmentCondition.Used),
+            "card" => nameof(PaymentMethod.Card),
+            "sbp" => nameof(PaymentMethod.Sbp),
+            "invoice" => nameof(PaymentMethod.Invoice),
+            "pickup" => nameof(DeliveryMode.Pickup),
+            "seller_delivery" => nameof(DeliveryMode.SellerDelivery),
+            "seller-delivery" => nameof(DeliveryMode.SellerDelivery),
+            "partner_delivery" => nameof(DeliveryMode.PartnerDelivery),
+            "partner-delivery" => nameof(DeliveryMode.PartnerDelivery),
+            _ => ToPascalCase(normalized)
+        };
+    }
+
+    private static string ToPascalCase(string value)
+    {
+        var parts = value.Replace('-', '_').Replace(' ', '_')
+            .Split('_', StringSplitOptions.RemoveEmptyEntries);
+
+        if (parts.Length == 0)
+        {
+            return value;
+        }
+
+        return string.Concat(parts.Select(part =>
+            part.Length == 1
+                ? part.ToUpperInvariant()
+                : char.ToUpperInvariant(part[0]) + part[1..]));
+    }
 
     private static OrderDto ToOrderDto(Order x) =>
         new(

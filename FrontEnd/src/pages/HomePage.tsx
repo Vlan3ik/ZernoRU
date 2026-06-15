@@ -1,33 +1,73 @@
-import { Button, Card, Col, Progress, Row, Space, Table, Tag, Typography } from 'antd';
+import {
+  BarChartOutlined,
+  SearchOutlined,
+  ShoppingOutlined,
+  TruckOutlined,
+} from '@ant-design/icons';
+import { Button, Card, Col, Row, Space, Table, Tag, Typography } from 'antd';
+import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { newsImageMap } from '../data/mediaAssets';
 import { useAppStore } from '../store/appStore';
 
 function formatRubles(value: number) {
   return value.toLocaleString('ru-RU');
 }
 
-function resolveNewsImage(id: string) {
-  return newsImageMap[id] ?? newsImageMap['n-1'] ?? '/images/thematic/image_01.jpg';
+function resolveNewsImage(imageUrl?: string) {
+  return imageUrl ?? '/images/thematic/image_01.jpg';
+}
+
+function FeatureCard({
+  icon,
+  title,
+  text,
+  variant = 'default',
+}: {
+  icon: ReactNode;
+  title: string;
+  text: string;
+  variant?: 'default' | 'grain' | 'field' | 'search' | 'market';
+}) {
+  return (
+    <Card className={`home-feature-card home-feature-card--${variant}`}>
+      <Space direction="vertical" size={12} align="center" style={{ width: '100%' }}>
+        <div className="home-feature-card__icon">{icon}</div>
+        <Typography.Text strong className="home-feature-card__title">
+          {title}
+        </Typography.Text>
+        <Typography.Text type="secondary" className="home-feature-card__text">
+          {text}
+        </Typography.Text>
+      </Space>
+    </Card>
+  );
 }
 
 export function HomePage() {
   const navigate = useNavigate();
   const grainLots = useAppStore((state) => state.grainLots);
   const equipmentLots = useAppStore((state) => state.equipmentLots);
-  const posts = useAppStore((state) => state.posts);
   const news = useAppStore((state) => state.news);
   const prices = useAppStore((state) => state.prices);
-  const analytics = useAppStore((state) => state.analytics);
+  const referenceCatalogs = useAppStore((state) => state.referenceCatalogs);
 
-  const heroNews = news[0];
   const leadLots = [...grainLots.slice(0, 2), ...equipmentLots.slice(0, 2)];
+  const latestNews = news.slice(0, 3);
+  const railItems = referenceCatalogs['rail-tariffs']?.slice(0, 1) ?? [];
 
-  const summaryCards = [
-    { title: 'Активные лоты', value: `${grainLots.length + equipmentLots.length}`, note: 'зерно, техника, услуги' },
-    { title: 'Новости дня', value: `${news.length}`, note: 'только российский и СНГ рынок' },
-    { title: 'Темы форума', value: `${posts.length}`, note: 'обсуждения и ответы' },
-    { title: 'Строки цен', value: `${prices.length}`, note: 'обновляемая витрина котировок' },
+  const heroFeatures = [
+    { title: 'Проверенные продавцы', text: 'Мы проверяем продавцов для вашей уверенности', icon: <ShoppingOutlined />, variant: 'grain' as const },
+    { title: 'С документами', text: 'Только лоты с полным пакетом документов', icon: <BarChartOutlined />, variant: 'field' as const },
+    { title: 'Быстрый поиск', text: 'Удобные фильтры помогают найти лучшее предложение', icon: <SearchOutlined />, variant: 'search' as const },
+    { title: 'Зерно / Техника / Услуги', text: 'Широкий выбор категорий для вашего бизнеса', icon: <TruckOutlined />, variant: 'market' as const },
+  ];
+
+
+  const whyCards = [
+    { title: 'Проверенные продавцы', text: 'Мы проверяем участников и их документы.', icon: <ShoppingOutlined /> },
+    { title: 'Документы и безопасность', text: 'Подтвержденные документы и прозрачные сделки.', icon: <BarChartOutlined /> },
+    { title: 'Прямые сделки', text: 'Без посредников и лишних комиссий.', icon: <SearchOutlined /> },
+    { title: 'Аналитика рынка', text: 'Актуальные данные, обзоры и прогнозы экспертов.', icon: <TruckOutlined /> },
   ];
 
   return (
@@ -40,40 +80,27 @@ export function HomePage() {
                 Информационно-торговый портал
               </Tag>
               <Typography.Title level={1} className="home-hero__title">
-                Главная витрина рынка зерна, цен и сделок
+                Рынок зерна сегодня
               </Typography.Title>
               <Typography.Paragraph className="lead-text home-hero__lead">
-                На одном экране собраны новости, биржевые ориентиры, активные лоты, логистика и аналитика по рынку России и СНГ.
+                Актуальные цены, активные предложения, логистика и аналитика для эффективных решений в агробизнесе.
               </Typography.Paragraph>
               <Space wrap>
                 <Button type="primary" size="large" onClick={() => navigate('/marketplace?tab=grain')}>
-                  Торговая площадка
+                  Смотреть предложения
                 </Button>
-                <Button size="large" onClick={() => navigate('/news')}>
-                  Новости
-                </Button>
-                <Button size="large" onClick={() => navigate('/prices')}>
-                  Цены
+                <Button size="large" onClick={() => navigate('/analytics')}>
+                  Смотреть аналитику
                 </Button>
               </Space>
             </Space>
           </Col>
 
           <Col xs={24} xl={12}>
-            <Row gutter={[14, 14]} className="home-hero__stats">
-              {summaryCards.map((item) => (
+            <Row gutter={[16, 16]} className="home-hero__features">
+              {heroFeatures.map((item) => (
                 <Col xs={12} key={item.title}>
-                  <Card className="home-hero-stat">
-                    <Typography.Text type="secondary" className="home-hero-stat__title">
-                      {item.title}
-                    </Typography.Text>
-                    <Typography.Title level={3} className="home-hero-stat__value">
-                      {item.value}
-                    </Typography.Title>
-                    <Typography.Text type="secondary" className="home-hero-stat__note">
-                      {item.note}
-                    </Typography.Text>
-                  </Card>
+                  <FeatureCard icon={item.icon} title={item.title} text={item.text} variant={item.variant} />
                 </Col>
               ))}
             </Row>
@@ -81,114 +108,90 @@ export function HomePage() {
         </Row>
       </Card>
 
-      <Row gutter={[24, 24]}>
-        <Col xs={24} xl={14}>
-          <Card
-            className="home-feature-card"
-            title="Главная новость дня"
-            extra={<Button type="link" onClick={() => navigate('/news')}>Все новости</Button>}
-          >
-            {heroNews ? (
-              <Row gutter={[18, 18]} align="middle">
-                <Col xs={24} md={10}>
-                  <img src={resolveNewsImage(heroNews.id)} alt={heroNews.title} className="home-news-image" />
-                </Col>
-                <Col xs={24} md={14}>
-                  <Space direction="vertical" size={10}>
-                    <Space wrap>
-                      <Tag color="green">{heroNews.section}</Tag>
-                      <Tag color="blue">{heroNews.culture}</Tag>
-                      <Tag>{heroNews.region}</Tag>
-                      <Typography.Text type="secondary">{heroNews.date}</Typography.Text>
-                    </Space>
-                    <Typography.Title level={3}>{heroNews.title}</Typography.Title>
-                    <Typography.Paragraph>{heroNews.lead}</Typography.Paragraph>
-                    <Space wrap>
-                      <Button type="primary" onClick={() => navigate(`/news/${heroNews.id}`)}>
-                        Открыть новость
-                      </Button>
-                      <Button onClick={() => navigate('/prices')}>
-                        Перейти к ценам
-                      </Button>
-                    </Space>
-                  </Space>
-                </Col>
-              </Row>
-            ) : (
-              <Typography.Text type="secondary">Новостей пока нет.</Typography.Text>
-            )}
-          </Card>
-        </Col>
 
-        <Col xs={24} xl={10}>
-          <Card
-            className="home-feature-card"
-            title="Актуальные цены"
-            extra={<Button type="link" onClick={() => navigate('/prices')}>Все котировки</Button>}
-          >
-            <Table
-              size="middle"
-              rowKey="id"
-              pagination={false}
-              dataSource={prices.slice(0, 5)}
-              columns={[
-                { title: 'Культура', dataIndex: 'culture', key: 'culture' },
-                { title: 'Регион', dataIndex: 'region', key: 'region' },
-                {
-                  title: 'Цена',
-                  dataIndex: 'day',
-                  key: 'day',
-                  render: (value: number) => `${formatRubles(value)} ₽/т`,
-                },
-              ]}
-            />
-          </Card>
-        </Col>
-      </Row>
-
-      <Row gutter={[24, 24]}>
-        <Col xs={24} xl={8}>
-          <Card className="home-mini-card" title="Торговая площадка" extra={<Button type="link" onClick={() => navigate('/marketplace')}>Открыть</Button>}>
-            <Space direction="vertical" size={12} style={{ width: '100%' }}>
-              <Typography.Text className="home-mini-card__text">
-                Проверенные продавцы, документы, логистика и аукционы в одном потоке.
-              </Typography.Text>
-              <Button block type="primary" onClick={() => navigate('/marketplace?tab=grain')}>
-                Смотреть лоты зерна
-              </Button>
-              <Progress percent={84} strokeColor="#2f6f3e" showInfo={false} />
-              <Space wrap>
-                <Tag color="green">Проверенные продавцы</Tag>
-                <Tag color="blue">Документы</Tag>
-                <Tag color="gold">Аукционы</Tag>
+      <Card className="home-split-card">
+        <Row gutter={[24, 24]}>
+          <Col xs={24} xl={14}>
+            <Card
+              className="home-news-card"
+              title="Главные новости"
+              extra={<Button type="link" onClick={() => navigate('/news')}>Смотреть все</Button>}
+            >
+              <Space direction="vertical" size={0} style={{ width: '100%' }}>
+                {latestNews.map((item, index) => (
+                  <div key={item.id} className="home-news-item" onClick={() => navigate(`/news/${item.id}`)} role="button" tabIndex={0}>
+                    <img src={resolveNewsImage(item.imageUrl)} alt={item.title} className="home-news-item__image" />
+                    <div className="home-news-item__copy">
+                      <Space wrap size={8}>
+                        <Typography.Text strong>{item.title}</Typography.Text>
+                      </Space>
+                      <Typography.Paragraph className="home-news-item__lead">{item.lead}</Typography.Paragraph>
+                      <Space wrap size={8}>
+                        <Typography.Text type="secondary">{item.date}</Typography.Text>
+                        <Tag>{item.section}</Tag>
+                        <Tag color="green">{index === 0 ? 'news' : item.culture}</Tag>
+                      </Space>
+                    </div>
+                  </div>
+                ))}
               </Space>
-            </Space>
-          </Card>
-        </Col>
+            </Card>
+          </Col>
 
-        <Col xs={24} xl={8}>
-          <Card className="home-mini-card" title="Логистика" extra={<Button type="link" onClick={() => navigate('/logistics')}>Открыть</Button>}>
-            <Space direction="vertical" size={10} style={{ width: '100%' }}>
-              <Typography.Text>Средний срок доставки по ключевым направлениям</Typography.Text>
-              <Progress percent={72} strokeColor="#2f6f3e" />
-              <Typography.Text>Срок маршрута ЦФО → ЮФО: 2,4 дня</Typography.Text>
-              <Typography.Text>Доля маршрутов без задержек: 81%</Typography.Text>
-              <Button onClick={() => navigate('/routes')}>Посмотреть маршруты</Button>
-            </Space>
-          </Card>
-        </Col>
+          <Col xs={24} xl={10}>
+            <Card className="home-prices-card" title="Актуальные цены" extra={<Button type="link" onClick={() => navigate('/prices')}>Все цены</Button>}>
+              <Table
+                size="middle"
+                rowKey="id"
+                pagination={false}
+                dataSource={prices.slice(0, 5)}
+                columns={[
+                  { title: 'Культура', dataIndex: 'culture', key: 'culture' },
+                  { title: 'Регион', dataIndex: 'region', key: 'region' },
+                  {
+                    title: 'Цена',
+                    dataIndex: 'day',
+                    key: 'day',
+                    render: (value: number) => `${formatRubles(value)} ₽/т`,
+                  },
+                ]}
+              />
+            </Card>
+          </Col>
+        </Row>
 
-        <Col xs={24} xl={8}>
-          <Card className="home-mini-card" title="Форум и аналитика" extra={<Button type="link" onClick={() => navigate('/forum')}>Открыть</Button>}>
-            <Space direction="vertical" size={10} style={{ width: '100%' }}>
-              <Typography.Text>Активных тем: {posts.length}</Typography.Text>
-              <Typography.Text>Новостей с аналитикой: {news.filter((item) => item.section === 'Аналитика').length}</Typography.Text>
-              <Typography.Text>Публикаций в этом месяце: {analytics.length}</Typography.Text>
-              <Button onClick={() => navigate('/analytics')}>Перейти в аналитику</Button>
-            </Space>
-          </Card>
-        </Col>
-      </Row>
+        <Row gutter={[24, 24]} style={{ marginTop: 24 }}>
+          <Col xs={24} md={12} xl={8}>
+            <Card className="home-rail-card" title="Индексы" extra={<Button type="link" onClick={() => navigate('/prices')}>Все индексы</Button>}>
+              <Space direction="vertical" size={6} style={{ width: '100%' }}>
+                <Typography.Text>Индекс внутреннего рынка ЦФО: {formatRubles(prices[0]?.day ?? 0)} ₽/т</Typography.Text>
+                <Typography.Text>Индекс экспортного спроса: 71,2</Typography.Text>
+                <Typography.Text>Индекс логистической нагрузки: 58,4</Typography.Text>
+              </Space>
+            </Card>
+          </Col>
+          <Col xs={24} md={12} xl={8}>
+            <Card className="home-rail-card" title="Логистика" extra={<Button type="link" onClick={() => navigate('/routes')}>Все маршруты</Button>}>
+              {railItems.map((item) => (
+                <Space direction="vertical" size={6} key={item.id}>
+                  <Typography.Text strong>{item.title}</Typography.Text>
+                  <Typography.Text type="secondary">{item.summary}</Typography.Text>
+                </Space>
+              ))}
+            </Card>
+          </Col>
+        </Row>
+      </Card>
+
+      <Card className="home-why-card" title="Почему ЗерноАгроМир">
+        <Row gutter={[16, 16]}>
+          {whyCards.map((item) => (
+            <Col xs={24} md={12} xl={6} key={item.title}>
+              <FeatureCard icon={item.icon} title={item.title} text={item.text} />
+            </Col>
+          ))}
+        </Row>
+      </Card>
 
       <Card className="home-lots-card" title="Свежие лоты" extra={<Button type="link" onClick={() => navigate('/marketplace')}>Все лоты</Button>}>
         <Row gutter={[16, 16]}>
@@ -231,14 +234,14 @@ export function HomePage() {
         </Row>
       </Card>
 
-      <Card className="home-rail-card" title="Биржевые ориентиры и комментарии">
+      <Card className="home-rail-card" title="Рыночные ориентиры и комментарии">
         <Row gutter={[16, 16]}>
           <Col xs={24} md={8}>
             <Space direction="vertical" size={8} style={{ width: '100%' }}>
-              <Typography.Text strong>Биржевые котировки</Typography.Text>
-              <Typography.Text>Биржа Санкт-Петербург: пшеница 3 класс — 16 840 ₽/т</Typography.Text>
-              <Typography.Text>МосБиржа: кукуруза — 15 120 ₽/т</Typography.Text>
-              <Typography.Text>Новороссийск FOB: ячмень — 13 950 ₽/т</Typography.Text>
+              <Typography.Text strong>Ценовые ориентиры</Typography.Text>
+              <Typography.Text>Пшеница 3 класса: 16 840 ₽/т</Typography.Text>
+              <Typography.Text>Кукуруза: 15 120 ₽/т</Typography.Text>
+              <Typography.Text>Ячмень: 13 950 ₽/т</Typography.Text>
             </Space>
           </Col>
           <Col xs={24} md={8}>

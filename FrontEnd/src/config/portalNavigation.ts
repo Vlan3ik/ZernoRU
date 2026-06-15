@@ -1,4 +1,4 @@
-﻿export interface PortalSubItem {
+export interface PortalSubItem {
   key: string;
   label: string;
   path: string;
@@ -16,7 +16,6 @@ export const regions = ['Россия', 'ЦФО', 'ЮФО', 'ПФО', 'Сиби�
 export const topQuickLinks = [
   { key: 'sign-in', label: 'Вход', path: '/cabinet' },
   { key: 'cabinet', label: 'Кабинет', path: '/cabinet' },
-  { key: 'favorites', label: 'Избранное', path: '/favorites' },
   { key: 'notifications', label: 'Уведомления', path: '/notifications' },
 ];
 
@@ -55,9 +54,6 @@ export const mainNavigation: PortalNavItem[] = [
       { key: 'prices-by-region', label: 'Пшеница по регионам', path: '/prices/regions' },
       { key: 'prices-corn', label: 'Кукуруза', path: '/prices/corn' },
       { key: 'prices-barley', label: 'Ячмень', path: '/prices/barley' },
-      { key: 'prices-exchange', label: 'Биржевые котировки', path: '/exchange' },
-      { key: 'prices-trades', label: 'Торги', path: '/prices/trades' },
-      { key: 'prices-duties', label: 'Пошлины', path: '/duties' },
       { key: 'prices-archive', label: 'Архив цен', path: '/prices/archive' },
     ],
   },
@@ -69,7 +65,6 @@ export const mainNavigation: PortalNavItem[] = [
       { key: 'marketplace-grain', label: 'Зерно', path: '/marketplace?tab=grain' },
       { key: 'marketplace-equipment', label: 'Техника', path: '/marketplace?tab=equipment' },
       { key: 'marketplace-services', label: 'Услуги', path: '/marketplace?tab=services' },
-      { key: 'marketplace-favorites', label: 'Избранные лоты', path: '/favorites' },
       { key: 'marketplace-compare', label: 'Сравнение', path: '/compare' },
     ],
   },
@@ -151,9 +146,9 @@ export const mainNavigation: PortalNavItem[] = [
     path: '/analytics',
     children: [
       { key: 'analytics-reviews', label: 'Обзоры рынка', path: '/analytics' },
-      { key: 'analytics-signals', label: 'Сигналы по посевам', path: '/analytics/demo' },
+      { key: 'analytics-signals', label: 'Сигналы по посевам', path: '/analytics/signals' },
       { key: 'analytics-subscription', label: 'Подписка на аналитику', path: '/analytics/subscription' },
-      { key: 'analytics-demo', label: 'Демо', path: '/analytics/demo' },
+      { key: 'analytics-demo', label: 'Пример отчета', path: '/analytics/demo' },
       { key: 'analytics-tariffs', label: 'Тарифы аналитики', path: '/analytics/tariffs' },
     ],
   },
@@ -180,7 +175,6 @@ export const mainNavigation: PortalNavItem[] = [
       { key: 'cabinet-purchases', label: 'Мои закупки', path: '/cabinet/purchases' },
       { key: 'cabinet-sales', label: 'Мои продажи', path: '/cabinet/sales' },
       { key: 'cabinet-orders', label: 'Заказы', path: '/orders' },
-      { key: 'cabinet-messages', label: 'Сообщения', path: '/messages' },
       { key: 'cabinet-docs', label: 'Документы', path: '/documents' },
       { key: 'cabinet-settings', label: 'Настройки профиля', path: '/cabinet/settings' },
     ],
@@ -193,7 +187,7 @@ export const footerColumns = [
     links: [
       { label: 'Главная', path: '/' },
       { label: 'Новости', path: '/news' },
-      { label: 'Цены и котировки', path: '/prices' },
+      { label: 'Цены', path: '/prices' },
       { label: 'Торговая площадка', path: '/marketplace' },
       { label: 'Форум', path: '/forum' },
     ],
@@ -203,7 +197,6 @@ export const footerColumns = [
     links: [
       { label: 'Логистика', path: '/logistics' },
       { label: 'Справочники', path: '/directories' },
-      { label: 'Центр сообщений', path: '/messages' },
       { label: 'Центр документов', path: '/documents' },
       { label: 'Помощь и поддержка', path: '/help' },
     ],

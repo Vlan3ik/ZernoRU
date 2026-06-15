@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "NUd5VX6j4JzengytvlWb6MqsYF7qnpKKuj3zW/EHmYBI6LcdpODozbDt2X828KJxJipk+66X86KBeUwAHKCsTA==",
+  "dgSpecHash": "KFTZCTFN9wU=",
   "success": true,
-  "projectFilePath": "/home/krl/Документы/ZernoRU/Backend/src/Zerno.Domain/Zerno.Domain.csproj",
+  "projectFilePath": "/src/src/Zerno.Domain/Zerno.Domain.csproj",
   "expectedPackageFiles": [],
   "logs": []
 }

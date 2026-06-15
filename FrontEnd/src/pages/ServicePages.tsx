@@ -1,4 +1,5 @@
-﻿import {
+/* eslint-disable react-refresh/only-export-components */
+import {
   BellOutlined,
   CheckCircleOutlined,
   ClockCircleOutlined,
@@ -8,7 +9,6 @@
 } from '@ant-design/icons';
 import {
   Alert,
-  Badge,
   Button,
   Card,
   Col,
@@ -18,6 +18,7 @@ import {
   Form,
   Input,
   List,
+  Modal,
   Progress,
   Row,
   Select,
@@ -28,15 +29,30 @@ import {
   Tag,
   Timeline,
   Typography,
+  message,
 } from 'antd';
 import dayjs from 'dayjs';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAppStore } from '../store/appStore';
+import { PriceRecord } from '../types/domain';
+import { buildPriceArchiveSeries, priceSlugForRecord } from '../utils/price';
+import { z } from 'zod';
+import {
+  CartesianGrid,
+  Legend,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
 
 export function CartPage() {
   const navigate = useNavigate();
   const cart = useAppStore((state) => state.cart);
+  const removeCartItem = useAppStore((state) => state.removeCartItem);
 
   const total = cart.reduce((sum, item) => sum + item.subtotal, 0);
 
@@ -61,6 +77,11 @@ export function CartPage() {
               { title: 'Количество', dataIndex: 'quantity', key: 'quantity' },
               { title: 'Цена за единицу', dataIndex: 'unitPrice', key: 'unitPrice', render: (v: number) => `${v.toLocaleString('ru-RU')} ₽` },
               { title: 'Сумма', dataIndex: 'subtotal', key: 'subtotal', render: (v: number) => `${v.toLocaleString('ru-RU')} ₽` },
+              {
+                title: 'Действие',
+                key: 'action',
+                render: (_, item) => <Button danger type="link" onClick={async () => void removeCartItem(item.id)}>Удалить</Button>,
+              },
             ]}
           />
         ) : (
@@ -98,58 +119,419 @@ export function CartPage() {
 
 export function CheckoutPage() {
   const navigate = useNavigate();
+  const checkout = useAppStore((state) => state.checkout);
+  const cart = useAppStore((state) => state.cart);
+  const users = useAppStore((state) => state.users);
+  const currentUserId = useAppStore((state) => state.currentUserId);
   const [step, setStep] = useState(0);
+  const [form] = Form.useForm();
 
-  const stepItems = ['Данные покупателя', 'Условия поставки', 'Документы и реквизиты', 'Подтверждение', 'Отправка заявки'];
+  const currentUser = users.find((user) => user.id === currentUserId);
+
+  const checkoutSchema = z.object({
+    organizationName: z.string().trim().min(2, 'Укажите организацию'),
+    contactName: z.string().trim().min(2, 'Укажите контактное лицо'),
+    phone: z.string().trim().min(10, 'Укажите телефон'),
+    email: z.string().trim().email('Укажите корректный email'),
+    deliveryMode: z.enum(['pickup', 'seller_delivery', 'partner_delivery']),
+    deliveryAddress: z.string().trim().optional().default(''),
+    deliveryDate: z.any().optional(),
+    paymentMethod: z.enum(['card', 'sbp', 'invoice']),
+    payerInn: z.string().trim().optional().default(''),
+    payerKpp: z.string().trim().optional().default(''),
+    payerAccount: z.string().trim().optional().default(''),
+    payerBank: z.string().trim().optional().default(''),
+    payerBik: z.string().trim().optional().default(''),
+    cardNumber: z.string().trim().optional().default(''),
+    cardHolder: z.string().trim().optional().default(''),
+    cardExpiry: z.string().trim().optional().default(''),
+    sbpPhone: z.string().trim().optional().default(''),
+    comment: z.string().trim().optional().default(''),
+  });
+
+  const stepTitles = ['Покупатель', 'Доставка', 'Оплата', 'Проверка'];
+
+  const deliveryMode = Form.useWatch('deliveryMode', form) ?? 'pickup';
+  const organizationName = Form.useWatch('organizationName', form) ?? '';
+  const contactName = Form.useWatch('contactName', form) ?? '';
+  const phone = Form.useWatch('phone', form) ?? '';
+  const email = Form.useWatch('email', form) ?? '';
+  const deliveryAddress = Form.useWatch('deliveryAddress', form) ?? '';
+  const deliveryDate = Form.useWatch('deliveryDate', form);
+  const paymentMethod = Form.useWatch('paymentMethod', form) ?? 'invoice';
+  const payerInn = Form.useWatch('payerInn', form) ?? '';
+  const payerKpp = Form.useWatch('payerKpp', form) ?? '';
+  const payerAccount = Form.useWatch('payerAccount', form) ?? '';
+  const payerBank = Form.useWatch('payerBank', form) ?? '';
+  const payerBik = Form.useWatch('payerBik', form) ?? '';
+  const cardNumber = Form.useWatch('cardNumber', form) ?? '';
+  const cardHolder = Form.useWatch('cardHolder', form) ?? '';
+  const cardExpiry = Form.useWatch('cardExpiry', form) ?? '';
+  const sbpPhone = Form.useWatch('sbpPhone', form) ?? '';
+  const comment = Form.useWatch('comment', form) ?? '';
+  const total = cart.reduce((sum, item) => sum + item.subtotal, 0);
+
+  const deliveryLabels: Record<string, string> = {
+    pickup: 'Самовывоз',
+    seller_delivery: 'Доставка продавцом',
+    partner_delivery: 'Через перевозчика',
+  };
+  const paymentLabels: Record<string, string> = {
+    invoice: 'Счет для юрлица',
+    card: 'Банковская карта',
+    sbp: 'СБП',
+  };
+
+  const normalizePhone = (value: string) => {
+    const digits = value.replace(/\D/g, '').replace(/^8/, '7');
+    const withCountry = digits.startsWith('7') ? digits : `7${digits}`;
+    const cut = withCountry.slice(0, 11);
+    const part1 = cut.slice(1, 4);
+    const part2 = cut.slice(4, 7);
+    const part3 = cut.slice(7, 9);
+    const part4 = cut.slice(9, 11);
+    return [
+      '+7',
+      part1 ? ` (${part1}` : '',
+      part1.length === 3 ? ')' : '',
+      part2 ? ` ${part2}` : '',
+      part3 ? `-${part3}` : '',
+      part4 ? `-${part4}` : '',
+    ].join('');
+  };
+
+  const onlyDigits = (value: string, max: number) => value.replace(/\D/g, '').slice(0, max);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    form.setFieldsValue({
+      organizationName: form.getFieldValue('organizationName') || currentUser.name,
+      contactName: form.getFieldValue('contactName') || currentUser.name,
+      email: form.getFieldValue('email') || currentUser.email,
+      payerInn: form.getFieldValue('payerInn') || currentUser.inn || '',
+    });
+  }, [currentUser, form]);
+
+  const paymentFields = () => {
+    if (paymentMethod === 'invoice') {
+      return ['paymentMethod', 'payerInn', 'payerAccount', 'payerBank', 'payerBik'];
+    }
+    if (paymentMethod === 'card') {
+      return ['paymentMethod', 'cardNumber', 'cardHolder', 'cardExpiry'];
+    }
+    return ['paymentMethod', 'sbpPhone'];
+  };
+
+  const goNext = async () => {
+    try {
+      const fields = step === 0
+        ? ['organizationName', 'contactName', 'phone', 'email']
+        : step === 1
+          ? (deliveryMode === 'pickup' ? ['deliveryMode', 'deliveryDate'] : ['deliveryMode', 'deliveryAddress', 'deliveryDate'])
+          : step === 2
+            ? [...paymentFields(), 'comment']
+            : [];
+      await form.validateFields(fields);
+      setStep((current) => Math.min(3, current + 1));
+    } catch {
+      message.error('Проверьте заполнение текущего шага');
+    }
+  };
+
+  const submitOrder = async () => {
+    try {
+      if (!cart.length) {
+        message.warning('Корзина пуста');
+        return;
+      }
+      const values = checkoutSchema.parse(form.getFieldsValue(true));
+      if (values.deliveryMode !== 'pickup' && !values.deliveryAddress) {
+        message.error('Укажите адрес доставки');
+        return;
+      }
+      if (values.paymentMethod === 'invoice' && (!values.payerInn || !values.payerAccount || !values.payerBank || !values.payerBik)) {
+        message.error('Заполните ИНН, расчетный счет, банк и БИК');
+        return;
+      }
+      if (values.paymentMethod === 'card' && (!values.cardNumber || !values.cardHolder || !values.cardExpiry)) {
+        message.error('Заполните данные карты');
+        return;
+      }
+      if (values.paymentMethod === 'sbp' && !values.sbpPhone) {
+        message.error('Укажите телефон для СБП');
+        return;
+      }
+
+      const order = await checkout(values.paymentMethod, values.deliveryMode, 0);
+      message.success(`Заказ ${order.id.slice(0, 8)} создан. Продавцу отправлено уведомление.`);
+      navigate('/orders');
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        message.error(error.issues[0]?.message ?? 'Проверьте форму');
+      } else {
+        message.error(error instanceof Error ? error.message : 'Не удалось создать заказ');
+      }
+    }
+  };
+
+  const deliveryDateText = deliveryDate && typeof deliveryDate?.format === 'function'
+    ? deliveryDate.format('DD.MM.YYYY')
+    : deliveryDate
+      ? dayjs(deliveryDate).format('DD.MM.YYYY')
+      : 'Не указана';
 
   return (
     <Space direction="vertical" size={24} style={{ width: '100%' }}>
       <Card className="section-card">
         <Typography.Title level={1}>Оформление заказа</Typography.Title>
-        <Typography.Paragraph className="lead-text">Пошаговый сценарий оформления заявки на покупку с проверкой данных по этапам.</Typography.Paragraph>
+        <Typography.Paragraph className="lead-text">
+          Данные покупателя подставляются из профиля, реквизиты разбиты по полям, доставка считается по условиям сделки без отдельной ручной стоимости.
+        </Typography.Paragraph>
       </Card>
 
       <Card>
-        <Steps current={step} items={stepItems.map((title) => ({ title }))} responsive />
+        <Steps
+          current={step}
+          items={stepTitles.map((title, index) => ({
+            title,
+            description: index === 0 ? 'Профиль покупателя' : index === 1 ? 'Способ поставки' : index === 2 ? 'Платежные данные' : 'Финальная проверка',
+          }))}
+          responsive
+        />
       </Card>
 
-      <Card title={stepItems[step]}>
-        <Form layout="vertical">
-          {step === 0 && (
-            <>
-              <Form.Item label="Название организации"><Input placeholder="ООО АгроТрейд" /></Form.Item>
-              <Row gutter={12}>
-                <Col span={12}><Form.Item label="Контакт"><Input placeholder="ФИО" /></Form.Item></Col>
-                <Col span={12}><Form.Item label="Телефон"><Input placeholder="+7 ..." /></Form.Item></Col>
-              </Row>
-            </>
-          )}
-          {step === 1 && (
-            <>
-              <Form.Item label="Способ поставки"><Select options={[{ value: 'Самовывоз', label: 'Самовывоз' }, { value: 'Доставка продавцом', label: 'Доставка продавцом' }, { value: 'Перевозчик', label: 'Через перевозчика' }]} /></Form.Item>
-              <Form.Item label="Ожидаемая дата"><DatePicker style={{ width: '100%' }} /></Form.Item>
-            </>
-          )}
-          {step === 2 && (
-            <>
-              <Form.Item label="Реквизиты"><Input.TextArea rows={4} placeholder="ИНН, КПП, расчетный счет" /></Form.Item>
-              <Form.Item label="Документы"><Input placeholder="Ссылка на пакет документов" /></Form.Item>
-            </>
-          )}
-          {step === 3 && (
-            <Alert type="info" message="Проверьте итоговые условия" description="После подтверждения заявка уйдет продавцу и появится в заказах и сделках." showIcon />
-          )}
-          {step === 4 && (
-            <Alert type="success" message="Готово к отправке" description="Нажмите «Отправить заявку», чтобы создать заказ и открыть сделку." showIcon />
-          )}
+      <Row gutter={[16, 16]}>
+        <Col xs={24} xl={16}>
+          <Card title={stepTitles[step]}>
+            <Form
+              form={form}
+              layout="vertical"
+              initialValues={{
+                organizationName: currentUser?.name ?? '',
+                contactName: currentUser?.name ?? '',
+                phone: '',
+                email: currentUser?.email ?? '',
+                deliveryMode: 'pickup',
+                deliveryAddress: '',
+                deliveryDate: null,
+                paymentMethod: 'invoice',
+                payerInn: currentUser?.inn ?? '',
+                payerKpp: '',
+                payerAccount: '',
+                payerBank: '',
+                payerBik: '',
+                cardNumber: '',
+                cardHolder: '',
+                cardExpiry: '',
+                sbpPhone: '',
+                comment: '',
+              }}
+            >
+              {step === 0 && (
+                <Row gutter={12}>
+                  <Col xs={24}>
+                    <Alert type="info" showIcon message="Организация подставлена из профиля" description="При необходимости можно уточнить название для конкретной сделки." style={{ marginBottom: 12 }} />
+                    <Form.Item name="organizationName" label="Организация" rules={[{ required: true, message: 'Укажите организацию' }]}>
+                      <Input placeholder="ООО АгроТрейд" />
+                    </Form.Item>
+                  </Col>
+                  <Col xs={24} md={12}>
+                    <Form.Item name="contactName" label="Контактное лицо" rules={[{ required: true, message: 'Укажите контактное лицо' }]}>
+                      <Input placeholder="Иван Петров" />
+                    </Form.Item>
+                  </Col>
+                  <Col xs={24} md={12}>
+                    <Form.Item name="phone" label="Телефон" rules={[{ required: true, message: 'Укажите телефон' }]}>
+                      <Input placeholder="+7 (900) 000-00-00" onChange={(event) => form.setFieldValue('phone', normalizePhone(event.target.value))} />
+                    </Form.Item>
+                  </Col>
+                  <Col xs={24}>
+                    <Form.Item name="email" label="Email" rules={[{ required: true, type: 'email', message: 'Укажите корректный email' }]}>
+                      <Input placeholder="buyer@company.ru" onBlur={(event) => form.setFieldValue('email', event.target.value.trim().toLowerCase())} />
+                    </Form.Item>
+                  </Col>
+                </Row>
+              )}
 
-          <Space style={{ marginTop: 16 }}>
-            <Button disabled={step === 0} onClick={() => setStep(Math.max(0, step - 1))}>Назад</Button>
-            {step < 4 && <Button type="primary" onClick={() => setStep(step + 1)}>Далее</Button>}
-            {step === 4 && <Button type="primary" onClick={() => navigate('/orders')}>Отправить заявку</Button>}
-          </Space>
-        </Form>
-      </Card>
+              {step === 1 && (
+                <Row gutter={12}>
+                  <Col xs={24} md={12}>
+                    <Form.Item name="deliveryMode" label="Способ поставки" rules={[{ required: true, message: 'Выберите способ поставки' }]}>
+                      <Select
+                        options={[
+                          { value: 'pickup', label: 'Самовывоз' },
+                          { value: 'seller_delivery', label: 'Доставка продавцом' },
+                          { value: 'partner_delivery', label: 'Через перевозчика' },
+                        ]}
+                      />
+                    </Form.Item>
+                  </Col>
+                  <Col xs={24} md={12}>
+                    <Form.Item name="deliveryDate" label="Желаемая дата">
+                      <DatePicker style={{ width: '100%' }} />
+                    </Form.Item>
+                  </Col>
+                  {deliveryMode !== 'pickup' && (
+                    <Col xs={24}>
+                      <Form.Item name="deliveryAddress" label="Адрес доставки" rules={[{ required: true, message: 'Укажите адрес доставки' }]}>
+                        <Input placeholder="Город, улица, склад, контакт на приемке" />
+                      </Form.Item>
+                    </Col>
+                  )}
+                  <Col xs={24}>
+                    <Alert
+                      type="success"
+                      showIcon
+                      message="Стоимость доставки убрана из оформления"
+                      description="Логистика согласуется с продавцом/перевозчиком после создания сделки и не смешивается с суммой товара."
+                    />
+                  </Col>
+                </Row>
+              )}
+
+              {step === 2 && (
+                <Row gutter={12}>
+                  <Col xs={24} md={12}>
+                    <Form.Item name="paymentMethod" label="Способ оплаты" rules={[{ required: true, message: 'Выберите оплату' }]}>
+                      <Select
+                        options={[
+                          { value: 'invoice', label: 'Счет для юрлица' },
+                          { value: 'card', label: 'Банковская карта' },
+                          { value: 'sbp', label: 'СБП' },
+                        ]}
+                      />
+                    </Form.Item>
+                  </Col>
+
+                  {paymentMethod === 'invoice' && (
+                    <>
+                      <Col xs={24} md={12}>
+                        <Form.Item name="payerInn" label="ИНН плательщика" rules={[{ required: true, message: 'Укажите ИНН' }]}>
+                          <Input placeholder="10 или 12 цифр" onChange={(event) => form.setFieldValue('payerInn', onlyDigits(event.target.value, 12))} />
+                        </Form.Item>
+                      </Col>
+                      <Col xs={24} md={12}>
+                        <Form.Item name="payerKpp" label="КПП">
+                          <Input placeholder="9 цифр, если есть" onChange={(event) => form.setFieldValue('payerKpp', onlyDigits(event.target.value, 9))} />
+                        </Form.Item>
+                      </Col>
+                      <Col xs={24} md={12}>
+                        <Form.Item name="payerAccount" label="Расчетный счет" rules={[{ required: true, message: 'Укажите расчетный счет' }]}>
+                          <Input placeholder="20 цифр" onChange={(event) => form.setFieldValue('payerAccount', onlyDigits(event.target.value, 20))} />
+                        </Form.Item>
+                      </Col>
+                      <Col xs={24} md={12}>
+                        <Form.Item name="payerBank" label="Банк" rules={[{ required: true, message: 'Укажите банк' }]}>
+                          <Input placeholder="Наименование банка" />
+                        </Form.Item>
+                      </Col>
+                      <Col xs={24} md={12}>
+                        <Form.Item name="payerBik" label="БИК" rules={[{ required: true, message: 'Укажите БИК' }]}>
+                          <Input placeholder="9 цифр" onChange={(event) => form.setFieldValue('payerBik', onlyDigits(event.target.value, 9))} />
+                        </Form.Item>
+                      </Col>
+                    </>
+                  )}
+
+                  {paymentMethod === 'card' && (
+                    <>
+                      <Col xs={24} md={12}>
+                        <Form.Item name="cardNumber" label="Номер карты" rules={[{ required: true, message: 'Укажите номер карты' }]}>
+                          <Input placeholder="0000 0000 0000 0000" onChange={(event) => form.setFieldValue('cardNumber', onlyDigits(event.target.value, 16).replace(/(.{4})/g, '$1 ').trim())} />
+                        </Form.Item>
+                      </Col>
+                      <Col xs={24} md={12}>
+                        <Form.Item name="cardHolder" label="Владелец карты" rules={[{ required: true, message: 'Укажите владельца карты' }]}>
+                          <Input placeholder="IVAN PETROV" onBlur={(event) => form.setFieldValue('cardHolder', event.target.value.trim().toUpperCase())} />
+                        </Form.Item>
+                      </Col>
+                      <Col xs={24} md={12}>
+                        <Form.Item name="cardExpiry" label="Срок действия" rules={[{ required: true, message: 'Укажите срок действия' }]}>
+                          <Input placeholder="MM/YY" />
+                        </Form.Item>
+                      </Col>
+                    </>
+                  )}
+
+                  {paymentMethod === 'sbp' && (
+                    <Col xs={24} md={12}>
+                      <Form.Item name="sbpPhone" label="Телефон для СБП" rules={[{ required: true, message: 'Укажите телефон СБП' }]}>
+                        <Input placeholder="+7 (900) 000-00-00" onChange={(event) => form.setFieldValue('sbpPhone', normalizePhone(event.target.value))} />
+                      </Form.Item>
+                    </Col>
+                  )}
+
+                  <Col xs={24}>
+                    <Form.Item name="comment" label="Комментарий к сделке">
+                      <Input.TextArea rows={4} placeholder="Особые условия, пожелания по отгрузке, контактный слот" />
+                    </Form.Item>
+                  </Col>
+                </Row>
+              )}
+
+              {step === 3 && (
+                <Space direction="vertical" size={16} style={{ width: '100%' }}>
+                  {cart.length === 0 ? <Alert type="warning" showIcon message="Корзина пуста" description="Добавьте лоты перед оформлением." /> : null}
+                  <Descriptions bordered column={1} size="small">
+                    <Descriptions.Item label="Организация">{organizationName}</Descriptions.Item>
+                    <Descriptions.Item label="Контакт">{contactName}</Descriptions.Item>
+                    <Descriptions.Item label="Телефон">{phone}</Descriptions.Item>
+                    <Descriptions.Item label="Email">{email}</Descriptions.Item>
+                    <Descriptions.Item label="Поставка">{deliveryLabels[String(deliveryMode)] ?? String(deliveryMode)}</Descriptions.Item>
+                    <Descriptions.Item label="Дата поставки">{deliveryDateText}</Descriptions.Item>
+                    <Descriptions.Item label="Адрес">{deliveryAddress || 'Не требуется'}</Descriptions.Item>
+                    <Descriptions.Item label="Оплата">{paymentLabels[String(paymentMethod)] ?? String(paymentMethod)}</Descriptions.Item>
+                    {paymentMethod === 'invoice' && <Descriptions.Item label="ИНН / КПП">{payerInn}{payerKpp ? ` / ${payerKpp}` : ''}</Descriptions.Item>}
+                    {paymentMethod === 'invoice' && <Descriptions.Item label="Банк и счет">{payerBank}, БИК {payerBik}, р/с {payerAccount}</Descriptions.Item>}
+                    {paymentMethod === 'card' && <Descriptions.Item label="Карта">{cardNumber ? `**** ${cardNumber.slice(-4)}` : 'Не указана'} · {cardHolder} · {cardExpiry}</Descriptions.Item>}
+                    {paymentMethod === 'sbp' && <Descriptions.Item label="Телефон СБП">{sbpPhone}</Descriptions.Item>}
+                    <Descriptions.Item label="Комментарий">{comment || 'Нет'}</Descriptions.Item>
+                  </Descriptions>
+
+                  <Table
+                    rowKey="id"
+                    size="small"
+                    pagination={false}
+                    dataSource={cart}
+                    columns={[
+                      { title: 'Лот', dataIndex: 'lotTitle', key: 'lotTitle' },
+                      { title: 'Продавец', dataIndex: 'sellerName', key: 'sellerName' },
+                      { title: 'Кол-во', dataIndex: 'quantity', key: 'quantity' },
+                      { title: 'Цена', dataIndex: 'unitPrice', key: 'unitPrice', render: (value: number) => `${value.toLocaleString('ru-RU')} ₽` },
+                      { title: 'Сумма', dataIndex: 'subtotal', key: 'subtotal', render: (value: number) => `${value.toLocaleString('ru-RU')} ₽` },
+                    ]}
+                  />
+
+                  <Alert
+                    type="info"
+                    showIcon
+                    message={`Итого по товарам: ${total.toLocaleString('ru-RU')} ₽`}
+                    description="После отправки заказ появится у покупателя и у продавца, а продавец получит уведомление."
+                  />
+                </Space>
+              )}
+
+              <Space style={{ marginTop: 16 }}>
+                <Button disabled={step === 0} onClick={() => setStep((current) => Math.max(0, current - 1))}>Назад</Button>
+                {step < 3 ? <Button type="primary" onClick={() => void goNext()}>Далее</Button> : <Button type="primary" onClick={() => void submitOrder()}>Отправить заявку</Button>}
+              </Space>
+            </Form>
+          </Card>
+        </Col>
+
+        <Col xs={24} xl={8}>
+          <Card title="Сводка заказа">
+            <Space direction="vertical" size={8} style={{ width: '100%' }}>
+              <Typography.Text>Позиций: {cart.length}</Typography.Text>
+              <Typography.Text strong>Товары: {total.toLocaleString('ru-RU')} ₽</Typography.Text>
+              <Typography.Text type="secondary">Доставка: согласуется отдельно</Typography.Text>
+              <Typography.Title level={4} style={{ margin: 0 }}>
+                Итого: {total.toLocaleString('ru-RU')} ₽
+              </Typography.Title>
+            </Space>
+          </Card>
+        </Col>
+      </Row>
     </Space>
   );
 }
@@ -243,10 +625,9 @@ export function OrderDetailPage() {
               ]}
             />
           </Card>
-          <Card title="Документы и сообщения" style={{ marginTop: 16 }}>
+          <Card title="Документы сделки" style={{ marginTop: 16 }}>
             <Space>
               <Button onClick={() => navigate('/documents')}>Центр документов</Button>
-              <Button onClick={() => navigate('/messages')}>Центр сообщений</Button>
               <Button onClick={() => navigate('/deals')}>Открыть сделку</Button>
             </Space>
           </Card>
@@ -254,9 +635,8 @@ export function OrderDetailPage() {
         <Col xs={24} xl={8}>
           <Card title="Параметры заказа">
             <Descriptions size="small" column={1}>
-              <Descriptions.Item label="Способ оплаты">{order.paymentMethod}</Descriptions.Item>
-              <Descriptions.Item label="Доставка">{order.deliveryMode}</Descriptions.Item>
-              <Descriptions.Item label="Стоимость доставки">{order.deliveryPrice.toLocaleString('ru-RU')} ₽</Descriptions.Item>
+              <Descriptions.Item label="Способ оплаты">{order.paymentMethod === 'card' ? 'Банковская карта' : order.paymentMethod === 'sbp' ? 'СБП' : 'Счет для юрлица'}</Descriptions.Item>
+              <Descriptions.Item label="Доставка">{order.deliveryMode === 'pickup' ? 'Самовывоз' : order.deliveryMode === 'seller_delivery' ? 'Доставка продавцом' : 'Через перевозчика'}</Descriptions.Item>
               <Descriptions.Item label="Количество позиций">{order.items.length}</Descriptions.Item>
             </Descriptions>
           </Card>
@@ -309,22 +689,6 @@ export function DealsPage() {
   );
 }
 
-export function FavoritesPage() {
-  return (
-    <Space direction="vertical" size={24} style={{ width: '100%' }}>
-      <Card className="section-card"><Typography.Title level={1}>Избранное</Typography.Title></Card>
-      <Tabs
-        items={[
-          { key: 'lots', label: 'Лоты', children: <Card className="nested-card">Пшеница 3 класса · 16 800 ₽/т</Card> },
-          { key: 'news', label: 'Новости', children: <Card className="nested-card">Экспорт пшеницы ускорился</Card> },
-          { key: 'forum', label: 'Темы форума', children: <Card className="nested-card">Сроки поставки в ЦФО</Card> },
-          { key: 'org', label: 'Организации', children: <Card className="nested-card">ООО АгроЭкспорт Логистика</Card> },
-        ]}
-      />
-    </Space>
-  );
-}
-
 export function ComparePage() {
   const grainLots = useAppStore((state) => state.grainLots);
   const rows = grainLots.slice(0, 2);
@@ -358,80 +722,129 @@ export function ComparePage() {
   );
 }
 
-export function MessagesPage() {
-  const [active, setActive] = useState('d1');
-  const dialogs = [
-    { id: 'd1', title: 'Сделка по пшенице 3 класса', unread: 2 },
-    { id: 'd2', title: 'Уточнение документов', unread: 0 },
-    { id: 'd3', title: 'Логистика Новороссийск', unread: 1 },
-  ];
-
-  return (
-    <Space direction="vertical" size={24} style={{ width: '100%' }}>
-      <Card className="section-card"><Typography.Title level={1}>Центр сообщений</Typography.Title></Card>
-      <Row gutter={[16, 16]}>
-        <Col xs={24} xl={8}>
-          <Card title="Диалоги" extra={<Input size="small" placeholder="Поиск" prefix={<SearchOutlined />} />}>
-            <List
-              dataSource={dialogs}
-              renderItem={(item) => (
-                <List.Item onClick={() => setActive(item.id)} style={{ cursor: 'pointer' }}>
-                  <Space style={{ width: '100%', justifyContent: 'space-between' }}>
-                    <Typography.Text strong={item.id === active}>{item.title}</Typography.Text>
-                    <Badge count={item.unread} size="small" />
-                  </Space>
-                </List.Item>
-              )}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} xl={16}>
-          <Card title="Диалог" extra={<Tag>Системные статусы включены</Tag>}>
-            <Space direction="vertical" size={12} style={{ width: '100%' }}>
-              <Alert type="info" showIcon message="Продавец подтвердил наличие документов" />
-              <Card className="nested-card">Покупатель: Просьба уточнить условия отгрузки на 22 апреля.</Card>
-              <Card className="nested-card">Продавец: Готовы отгрузить 120 т, окно подачи транспорта с 10:00 до 16:00.</Card>
-              <Input.TextArea rows={4} placeholder="Введите сообщение" />
-              <Space>
-                <Button type="primary">Отправить</Button>
-                <Button>Прикрепить файл</Button>
-              </Space>
-            </Space>
-          </Card>
-        </Col>
-      </Row>
-    </Space>
-  );
-}
-
 export function DocumentsPage() {
+  const orders = useAppStore((state) => state.orders);
+  const sellerApplications = useAppStore((state) => state.sellerApplications);
+  const users = useAppStore((state) => state.users);
+  const currentUserId = useAppStore((state) => state.currentUserId);
+  const [type, setType] = useState<string | undefined>();
+  const [status, setStatus] = useState<string | undefined>();
+  const [query, setQuery] = useState('');
+  const [selectedDoc, setSelectedDoc] = useState<any | null>(null);
+
+  const currentUser = users.find((user) => user.id === currentUserId);
+  const documentRows = useMemo(() => {
+    const orderDocs = orders.flatMap((order) => [
+      {
+        id: `contract-${order.id}`,
+        type: 'Договор поставки',
+        counterparty: order.items.map((item) => item.sellerName).join(', '),
+        status: order.status === 'created' ? 'Ожидает согласования' : 'Подписан',
+        date: dayjs(order.createdAt).format('DD.MM.YYYY'),
+        source: 'order',
+        order,
+        text: `Договор поставки по заказу ${order.id.slice(0, 8)}. Покупатель: ${currentUser?.name ?? 'Пользователь'}. Продавцы: ${order.items.map((item) => item.sellerName).join(', ')}. Сумма: ${order.total.toLocaleString('ru-RU')} ₽.`,
+      },
+      {
+        id: `invoice-${order.id}`,
+        type: 'Счет на оплату',
+        counterparty: order.items.map((item) => item.sellerName).join(', '),
+        status: order.status === 'created' ? 'Сформирован' : 'Оплачен',
+        date: dayjs(order.createdAt).format('DD.MM.YYYY'),
+        source: 'order',
+        order,
+        text: `Счет на оплату по заказу ${order.id.slice(0, 8)}. Итого: ${order.total.toLocaleString('ru-RU')} ₽. Способ оплаты: ${order.paymentMethod}.`,
+      },
+    ]);
+
+    const applicationDocs = sellerApplications
+      .filter((application) => application.userId === currentUserId)
+      .map((application) => ({
+        id: `seller-${application.id}`,
+        type: 'Подтверждение продавца',
+        counterparty: application.companyName,
+        status: application.status === 'approved' ? 'Подтверждено' : application.status === 'rejected' ? 'Отклонено' : 'На проверке',
+        date: dayjs(application.submittedAt).format('DD.MM.YYYY'),
+        source: 'verification',
+        application,
+        text: `Заявка на подтверждение документов. Компания: ${application.companyName}. ИНН: ${application.inn}. ОГРН: ${application.ogrn}. Статус: ${application.status}.`,
+      }));
+
+    return [...orderDocs, ...applicationDocs];
+  }, [currentUser?.name, currentUserId, orders, sellerApplications]);
+
+  const filteredRows = useMemo(
+    () => documentRows.filter((row) => {
+      if (type && row.source !== type) return false;
+      if (status && !row.status.toLowerCase().includes(status.toLowerCase())) return false;
+      if (query && !`${row.type} ${row.counterparty} ${row.status}`.toLowerCase().includes(query.toLowerCase())) return false;
+      return true;
+    }),
+    [documentRows, query, status, type],
+  );
+
+  const downloadDocument = (row: any) => {
+    const blob = new Blob([row.text], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${row.id}.txt`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+  };
+
   return (
     <Space direction="vertical" size={24} style={{ width: '100%' }}>
-      <Card className="section-card"><Typography.Title level={1}>Центр документов</Typography.Title></Card>
+      <Card className="section-card">
+        <Typography.Title level={1}>Центр документов</Typography.Title>
+        <Typography.Paragraph className="lead-text">
+          Документы формируются из реальных заказов и заявок профиля. Их можно открыть, проверить и скачать.
+        </Typography.Paragraph>
+      </Card>
       <Card title="Фильтры">
-        <Row gutter={12}>
-          <Col xs={24} md={6}><Select placeholder="Тип документа" options={[{ value: 'verification', label: 'Проверка продавца' }, { value: 'order', label: 'Заказы' }, { value: 'deal', label: 'Сделки' }]} /></Col>
-          <Col xs={24} md={6}><Select placeholder="Статус подписи" options={[{ value: 'pending', label: 'Ожидает подписи' }, { value: 'signed', label: 'Подписан' }]} /></Col>
-          <Col xs={24} md={6}><Input placeholder="Контрагент" /></Col>
-          <Col xs={24} md={6}><Button block>Применить</Button></Col>
+        <Row gutter={[12, 12]}>
+          <Col xs={24} md={6}><Select allowClear value={type} onChange={setType} placeholder="Тип документа" options={[{ value: 'verification', label: 'Проверка продавца' }, { value: 'order', label: 'Заказы и сделки' }]} style={{ width: '100%' }} /></Col>
+          <Col xs={24} md={6}><Select allowClear value={status} onChange={setStatus} placeholder="Статус" options={[{ value: 'ожидает', label: 'Ожидает' }, { value: 'подписан', label: 'Подписан' }, { value: 'подтверждено', label: 'Подтверждено' }, { value: 'проверке', label: 'На проверке' }]} style={{ width: '100%' }} /></Col>
+          <Col xs={24} md={8}><Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Документ, контрагент, статус" /></Col>
+          <Col xs={24} md={4}><Button block onClick={() => { setType(undefined); setStatus(undefined); setQuery(''); }}>Сбросить</Button></Col>
         </Row>
       </Card>
       <Card title="Документы">
         <Table
           rowKey="id"
-          dataSource={[
-            { id: 'doc-1', type: 'Договор поставки', counterparty: 'КФХ Вяземские Поля', status: 'Ожидает подписи', date: '17.04.2026' },
-            { id: 'doc-2', type: 'Счет на оплату', counterparty: 'ООО ТрансЗерно', status: 'Подписан', date: '16.04.2026' },
-          ]}
+          dataSource={filteredRows}
+          locale={{ emptyText: 'Документы появятся после создания заказа или отправки заявки продавца' }}
           columns={[
             { title: 'Документ', dataIndex: 'type', key: 'type' },
             { title: 'Контрагент', dataIndex: 'counterparty', key: 'counterparty' },
-            { title: 'Статус', dataIndex: 'status', key: 'status' },
+            { title: 'Статус', dataIndex: 'status', key: 'status', render: (value: string) => <Tag color={value.includes('Отклон') ? 'red' : value.includes('Ожида') || value.includes('провер') ? 'gold' : 'green'}>{value}</Tag> },
             { title: 'Дата', dataIndex: 'date', key: 'date' },
-            { title: 'Действие', key: 'action', render: () => <Button type="link">Открыть</Button> },
+            { title: 'Действие', key: 'action', render: (_, row) => <Space><Button type="link" onClick={() => setSelectedDoc(row)}>Открыть</Button><Button type="link" onClick={() => downloadDocument(row)}>Скачать</Button></Space> },
           ]}
         />
       </Card>
+      <Modal
+        title={selectedDoc?.type ?? 'Документ'}
+        open={Boolean(selectedDoc)}
+        onCancel={() => setSelectedDoc(null)}
+        footer={[
+          <Button key="download" onClick={() => selectedDoc && downloadDocument(selectedDoc)}>Скачать</Button>,
+          <Button key="close" type="primary" onClick={() => setSelectedDoc(null)}>Закрыть</Button>,
+        ]}
+      >
+        {selectedDoc && (
+          <Space direction="vertical" size={12} style={{ width: '100%' }}>
+            <Descriptions bordered column={1} size="small">
+              <Descriptions.Item label="Контрагент">{selectedDoc.counterparty}</Descriptions.Item>
+              <Descriptions.Item label="Статус">{selectedDoc.status}</Descriptions.Item>
+              <Descriptions.Item label="Дата">{selectedDoc.date}</Descriptions.Item>
+            </Descriptions>
+            <Alert type="info" showIcon message="Содержимое документа" description={selectedDoc.text} />
+          </Space>
+        )}
+      </Modal>
     </Space>
   );
 }
@@ -480,7 +893,6 @@ export function NotificationsPage() {
     market: ['Пшеница 3 класса выросла на 220 ₽/т', 'Обновлены котировки в порту Новороссийск'],
     system: ['Проверка продавца: требуется уточнение документа'],
     orders: ['Заказ ord-1 перешел в статус «В обработке»'],
-    messages: ['Новое сообщение по сделке от продавца'],
     forum: ['Эксперт ответил в теме «Сроки поставки»'],
   };
 
@@ -494,7 +906,6 @@ export function NotificationsPage() {
           { key: 'market', label: 'Рыночные' },
           { key: 'system', label: 'Системные' },
           { key: 'orders', label: 'По заказам' },
-          { key: 'messages', label: 'По сообщениям' },
           { key: 'forum', label: 'По форуму' },
         ]}
       />
@@ -544,6 +955,92 @@ export function HelpPage() {
   );
 }
 
+export function AuctionInfoPage() {
+  return (
+    <Space direction="vertical" size={24} style={{ width: '100%' }}>
+      <Card className="auction-info-hero section-card">
+        <Row gutter={[24, 24]} align="middle">
+          <Col xs={24} xl={12}>
+            <Space direction="vertical" size={18} style={{ width: '100%' }}>
+              <Tag color="purple">Что такое аукцион</Tag>
+              <Typography.Title level={1}>Торги, где цена растет по шагу и время решает исход</Typography.Title>
+              <Typography.Paragraph className="lead-text">
+                Аукцион на ZernoRU помогает продавцу получить лучшую цену за партию, а покупателю видеть реальную конкуренцию.
+                Ставка мгновенно уходит на сервер, таймер показывает оставшееся время, а победитель определяется автоматически.
+              </Typography.Paragraph>
+              <Space wrap>
+                <Tag color="green">Ставка по шагу</Tag>
+                <Tag color="blue">Обратный отсчет</Tag>
+                <Tag color="gold">История ставок</Tag>
+                <Tag color="purple">Итог по завершении</Tag>
+              </Space>
+            </Space>
+          </Col>
+          <Col xs={24} xl={12}>
+            <div className="auction-info-hero__media">
+              <img src="/images/thematic/image_24.jpg" alt="Зерновой аукцион" className="auction-info-hero__image" />
+            </div>
+          </Col>
+        </Row>
+      </Card>
+
+      <Row gutter={[16, 16]}>
+        <Col xs={24} xl={8}>
+          <Card title="Как это работает">
+            <Steps
+              direction="vertical"
+              current={3}
+              items={[
+                { title: 'Лот публикуется', description: 'Продавец включает аукцион и задает время завершения торгов.' },
+                { title: 'Покупатели делают ставки', description: 'Каждая новая ставка должна быть не ниже шага.' },
+                { title: 'Таймер идет вниз', description: 'Пока время не вышло, аукцион продолжается и обновляется.' },
+                { title: 'Система определяет победителя', description: 'После окончания торгов сервер фиксирует лучшую ставку.' },
+              ]}
+            />
+          </Card>
+        </Col>
+        <Col xs={24} xl={8}>
+          <Card title="Почему это удобно">
+            <List
+              dataSource={[
+                'Видно, кто сейчас лидирует и на сколько выросла цена',
+                'Не нужно обновлять страницу вручную',
+                'История ставок помогает оценить конкуренцию',
+                'После завершения видно, выиграли вы или нет',
+              ]}
+              renderItem={(item) => <List.Item>{item}</List.Item>}
+            />
+          </Card>
+        </Col>
+        <Col xs={24} xl={8}>
+          <Card title="Правила торгов">
+            <Space direction="vertical" size={12} style={{ width: '100%' }}>
+              <Alert
+                type="info"
+                showIcon
+                message="Минимальный шаг"
+                description="Новая ставка должна быть выше текущей минимум на шаг аукциона."
+              />
+              <Alert
+                type="success"
+                showIcon
+                message="Победитель"
+                description="Когда таймер заканчивается, победителем становится последний лидер."
+              />
+              <Alert
+                type="warning"
+                showIcon
+                message="Что делать после победы"
+                description="Свяжитесь с продавцом, согласуйте документы и завершите сделку."
+              />
+            </Space>
+          </Card>
+        </Col>
+      </Row>
+    </Space>
+  );
+}
+
 interface ContentArticlePageProps {
   title: string;
   sections: { heading: string; body: string }[];
@@ -584,37 +1081,188 @@ export function ContentArticlePage({ title, sections }: ContentArticlePageProps)
   );
 }
 
+export interface PriceArchiveRow {
+  id: string;
+  year: string;
+  culture: string;
+  region: string;
+  currentPrice: number;
+  previousPrice: number;
+  archiveTrend: Array<{ step: string; price: number }>;
+  source: PriceRecord;
+}
+
+export function buildArchiveRows(prices: PriceRecord[]): PriceArchiveRow[] {
+  return prices.flatMap((record, index) => {
+    const yearlyShift = index % 2 === 0 ? 0.91 : 0.94;
+    const years = ['2026', '2025'];
+
+    return years.map((year, yearIndex) => {
+      const adjustedRecord = {
+        ...record,
+        day: Math.round(record.day * (yearIndex === 0 ? 1 : yearlyShift)),
+        weekChange: Math.round(record.weekChange * (yearIndex === 0 ? 1 : 0.85) * 10) / 10,
+      };
+      const currentPrice = adjustedRecord.day;
+      const previousPrice = Math.max(1, Math.round(currentPrice - adjustedRecord.weekChange * 2.2));
+
+      return {
+        id: `${record.id}-${year}`,
+        year,
+        culture: adjustedRecord.culture,
+        region: adjustedRecord.region,
+        currentPrice,
+        previousPrice,
+        archiveTrend: buildPriceArchiveSeries(adjustedRecord, year === '2026' ? 'month' : 'quarter'),
+        source: record,
+      };
+    });
+  });
+}
+
 export function PriceArchivePage() {
+  const navigate = useNavigate();
   const prices = useAppStore((state) => state.prices);
+  const [year, setYear] = useState<string | undefined>('2026');
+  const [culture, setCulture] = useState<string | undefined>();
+  const [region, setRegion] = useState<string | undefined>();
+  const [period, setPeriod] = useState<'week' | 'month' | 'quarter'>('month');
+
+  const archiveRows = useMemo(() => buildArchiveRows(prices), [prices]);
+
+  const filteredRows = useMemo(() => {
+    return archiveRows.filter((row) => {
+      if (year && row.year !== year) return false;
+      if (culture && row.culture !== culture) return false;
+      if (region && row.region !== region) return false;
+      return true;
+    });
+  }, [archiveRows, culture, region, year]);
+
+  const selectedRow = filteredRows[0] ?? archiveRows[0];
+  const chartData = selectedRow ? buildPriceArchiveSeries(selectedRow.source, period) : [];
+
+  const cultureOptions = [...new Set(archiveRows.map((row) => row.culture))];
+  const regionOptions = [...new Set(archiveRows.map((row) => row.region))];
+  const yearOptions = [...new Set(archiveRows.map((row) => row.year))];
 
   return (
     <Space direction="vertical" size={24} style={{ width: '100%' }}>
-      <Card className="section-card"><Typography.Title level={1}>Архив цен</Typography.Title></Card>
+      <Card className="section-card">
+        <Typography.Title level={1}>Архив цен</Typography.Title>
+        <Typography.Paragraph className="lead-text">
+          Архив строится из тех же рыночных записей, что и основная страница цен, поэтому фильтры и карточка детализации остаются согласованными.
+        </Typography.Paragraph>
+      </Card>
+
       <Card title="Параметры архива">
-        <Row gutter={12}>
-          <Col xs={24} md={6}><Select placeholder="Год" options={[{ value: '2026', label: '2026' }, { value: '2025', label: '2025' }]} /></Col>
-          <Col xs={24} md={6}><Select placeholder="Культура" options={prices.map((item) => ({ value: item.id, label: item.culture }))} /></Col>
-          <Col xs={24} md={6}><Select placeholder="Период" options={[{ value: 'week', label: 'Недели' }, { value: 'month', label: 'Месяцы' }]} /></Col>
-          <Col xs={24} md={6}><Button block>Сравнить периоды</Button></Col>
+        <Row gutter={[12, 12]}>
+          <Col xs={24} md={6}>
+            <Select
+              allowClear
+              placeholder="Год"
+              value={year}
+              onChange={setYear}
+              options={yearOptions.map((value) => ({ value, label: value }))}
+              style={{ width: '100%' }}
+            />
+          </Col>
+          <Col xs={24} md={6}>
+            <Select
+              allowClear
+              placeholder="Культура"
+              value={culture}
+              onChange={setCulture}
+              options={cultureOptions.map((value) => ({ value, label: value }))}
+              style={{ width: '100%' }}
+            />
+          </Col>
+          <Col xs={24} md={6}>
+            <Select
+              allowClear
+              placeholder="Регион"
+              value={region}
+              onChange={setRegion}
+              options={regionOptions.map((value) => ({ value, label: value }))}
+              style={{ width: '100%' }}
+            />
+          </Col>
+          <Col xs={24} md={6}>
+            <Select
+              value={period}
+              onChange={setPeriod}
+              options={[
+                { value: 'week', label: 'Недели' },
+                { value: 'month', label: 'Месяцы' },
+                { value: 'quarter', label: 'Кварталы' },
+              ]}
+              style={{ width: '100%' }}
+            />
+          </Col>
         </Row>
+        <Typography.Text type="secondary">Найдено записей: {filteredRows.length}</Typography.Text>
       </Card>
-      <Card title="Исторические значения">
-        <Table
-          rowKey="month"
-          dataSource={[
-            { month: 'Январь', pw3: 15820, pw4: 14960, barley: 13210 },
-            { month: 'Февраль', pw3: 16040, pw4: 15120, barley: 13480 },
-            { month: 'Март', pw3: 16410, pw4: 15410, barley: 13720 },
-            { month: 'Апрель', pw3: 16800, pw4: 15620, barley: 13950 },
-          ]}
-          columns={[
-            { title: 'Период', dataIndex: 'month', key: 'month' },
-            { title: 'Пшеница 3 класса', dataIndex: 'pw3', key: 'pw3', render: (v: number) => `${v.toLocaleString('ru-RU')} ₽/т` },
-            { title: 'Пшеница 4 класса', dataIndex: 'pw4', key: 'pw4', render: (v: number) => `${v.toLocaleString('ru-RU')} ₽/т` },
-            { title: 'Ячмень', dataIndex: 'barley', key: 'barley', render: (v: number) => `${v.toLocaleString('ru-RU')} ₽/т` },
-          ]}
-        />
-      </Card>
+
+      <Row gutter={[16, 16]}>
+        <Col xs={24} xl={16}>
+          <Card title="Исторические значения">
+            {selectedRow ? (
+              <div style={{ width: '100%', height: 320 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={chartData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="step" />
+                    <YAxis width={80} />
+                    <Tooltip formatter={(value: unknown) => `${Number(value ?? 0).toLocaleString('ru-RU')} ₽/т`} />
+                    <Legend />
+                    <Line type="monotone" dataKey="price" stroke="#2f6f3e" strokeWidth={3} dot={false} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <Empty description="Нет данных по выбранным фильтрам" />
+            )}
+          </Card>
+        </Col>
+
+        <Col xs={24} xl={8}>
+          <Card title="Выбранная запись">
+            {selectedRow ? (
+              <Space direction="vertical" size={8}>
+                <Typography.Title level={3} style={{ margin: 0 }}>{selectedRow.culture}</Typography.Title>
+                <Typography.Text type="secondary">{selectedRow.region} · {selectedRow.year}</Typography.Text>
+                <Typography.Text strong>{selectedRow.currentPrice.toLocaleString('ru-RU')} ₽/т</Typography.Text>
+                <Typography.Text type="secondary">
+                  Предыдущий период: {selectedRow.previousPrice.toLocaleString('ru-RU')} ₽/т
+                </Typography.Text>
+                <Button type="link" onClick={() => navigate(`/prices/${priceSlugForRecord(selectedRow.source)}`)} style={{ padding: 0, height: 'auto' }}>
+                  Открыть детальную цену
+                </Button>
+              </Space>
+            ) : (
+              <Empty description="Нет выбранной записи" />
+            )}
+          </Card>
+
+          <Card title="Сводка" style={{ marginTop: 16 }}>
+            <Table
+              rowKey="id"
+              pagination={{ pageSize: 6 }}
+              dataSource={filteredRows}
+              columns={[
+                { title: 'Культура', dataIndex: 'culture', key: 'culture' },
+                { title: 'Год', dataIndex: 'year', key: 'year' },
+                {
+                  title: 'Цена',
+                  dataIndex: 'currentPrice',
+                  key: 'currentPrice',
+                  render: (value: number) => `${value.toLocaleString('ru-RU')} ₽/т`,
+                },
+              ]}
+            />
+          </Card>
+        </Col>
+      </Row>
     </Space>
   );
 }

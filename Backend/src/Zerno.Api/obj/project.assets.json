@@ -3169,19 +3169,19 @@
     ]
   },
   "packageFolders": {
-    "/home/krl/.nuget/packages/": {}
+    "/root/.nuget/packages/": {}
   },
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "/home/krl/Документы/ZernoRU/Backend/src/Zerno.Api/Zerno.Api.csproj",
+      "projectUniqueName": "/src/src/Zerno.Api/Zerno.Api.csproj",
       "projectName": "Zerno.Api",
-      "projectPath": "/home/krl/Документы/ZernoRU/Backend/src/Zerno.Api/Zerno.Api.csproj",
-      "packagesPath": "/home/krl/.nuget/packages/",
-      "outputPath": "/home/krl/Документы/ZernoRU/Backend/src/Zerno.Api/obj/",
+      "projectPath": "/src/src/Zerno.Api/Zerno.Api.csproj",
+      "packagesPath": "/root/.nuget/packages/",
+      "outputPath": "/src/src/Zerno.Api/obj/",
       "projectStyle": "PackageReference",
       "configFilePaths": [
-        "/home/krl/.nuget/NuGet/NuGet.Config"
+        "/root/.nuget/NuGet/NuGet.Config"
       ],
       "originalTargetFrameworks": [
         "net8.0"
@@ -3193,11 +3193,11 @@
         "net8.0": {
           "targetAlias": "net8.0",
           "projectReferences": {
-            "/home/krl/Документы/ZernoRU/Backend/src/Zerno.Application/Zerno.Application.csproj": {
-              "projectPath": "/home/krl/Документы/ZernoRU/Backend/src/Zerno.Application/Zerno.Application.csproj"
+            "/src/src/Zerno.Application/Zerno.Application.csproj": {
+              "projectPath": "/src/src/Zerno.Application/Zerno.Application.csproj"
             },
-            "/home/krl/Документы/ZernoRU/Backend/src/Zerno.Infrastructure/Zerno.Infrastructure.csproj": {
-              "projectPath": "/home/krl/Документы/ZernoRU/Backend/src/Zerno.Infrastructure/Zerno.Infrastructure.csproj"
+            "/src/src/Zerno.Infrastructure/Zerno.Infrastructure.csproj": {
+              "projectPath": "/src/src/Zerno.Infrastructure/Zerno.Infrastructure.csproj"
             }
           }
         }
@@ -3206,6 +3206,11 @@
         "warnAsError": [
           "NU1605"
         ]
+      },
+      "restoreAuditProperties": {
+        "enableAudit": "true",
+        "auditLevel": "low",
+        "auditMode": "direct"
       }
     },
     "frameworks": {
@@ -3254,7 +3259,7 @@
             "privateAssets": "all"
           }
         },
-        "runtimeIdentifierGraphPath": "/usr/lib64/dotnet/sdk/8.0.127/PortableRuntimeIdentifierGraph.json"
+        "runtimeIdentifierGraphPath": "/usr/share/dotnet/sdk/8.0.422/PortableRuntimeIdentifierGraph.json"
       }
     }
   }

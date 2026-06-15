@@ -1,4 +1,4 @@
-﻿export interface NewsItem {
+export interface NewsItem {
   id: string;
   title: string;
   lead: string;
@@ -23,7 +23,7 @@ export const newsFeed: NewsItem[] = [
     region: 'ЮФО',
     type: 'Новость',
     date: '17.04.2026 09:30',
-    source: 'Редакция ЗерноРУ',
+    source: 'Редакция ЗерноАгроМир',
   },
   {
     id: 'n-2',
@@ -83,16 +83,7 @@ export const priceRows = [
   { key: 'corn', culture: 'Кукуруза', region: 'ЮФО', port: 'Новороссийск', day: 15120, week: 14870, month: 14410 },
 ];
 
-export const forumSections = [
-  'Агрономия',
-  'Торговля',
-  'Техника',
-  'Логистика',
-  'Документы и право',
-  'Экспорт',
-  'Хранение и переработка',
-  'Цены и рынок',
-];
+export const forumSections = ['Агрономия', 'Торговля', 'Техника'];
 
 export const globalSearchTabs = ['Новости', 'Цены', 'Лоты', 'Организации', 'Темы форума', 'Аналитика', 'Справочники'];
 
@@ -101,12 +92,10 @@ export const supportPages = [
   { path: '/checkout', title: 'Оформление заказа', description: 'Подтверждение условий и расчет итоговой стоимости.' },
   { path: '/orders', title: 'История заказов', description: 'Все активные и завершенные заказы.' },
   { path: '/deals', title: 'История сделок', description: 'История согласований и выполненных отгрузок.' },
-  { path: '/favorites', title: 'Избранные лоты', description: 'Сохраненные предложения по зерну, технике и услугам.' },
   { path: '/compare', title: 'Сравнение', description: 'Сравнение параметров и условий лотов.' },
-  { path: '/messages', title: 'Центр сообщений', description: 'Диалоги по сделкам, логистике и документам.' },
   { path: '/documents', title: 'Центр документов', description: 'Сертификаты, договоры, счета и закрывающие документы.' },
   { path: '/billing', title: 'Счета и оплаты', description: 'Оплата услуг и контроль статусов платежей.' },
-  { path: '/notifications', title: 'Уведомления', description: 'События по ценам, лотам, заказам и сообщениям.' },
+  { path: '/notifications', title: 'Уведомления', description: 'События по ценам, лотам, заказам и документам.' },
   { path: '/help', title: 'Помощь и поддержка', description: 'Поддержка пользователей и база ответов.' },
   { path: '/about', title: 'О сервисе', description: 'О портале, принципах работы и данных рынка.' },
   { path: '/advertising', title: 'Реклама', description: 'Размещение рекламы и информационных кампаний.' },
@@ -115,14 +104,12 @@ export const supportPages = [
   { path: '/lot-rules', title: 'Правила размещения лотов', description: 'Требования к карточкам и документам лота.' },
   { path: '/privacy', title: 'Политика конфиденциальности', description: 'Порядок обработки персональных данных.' },
   { path: '/terms', title: 'Пользовательское соглашение', description: 'Правила использования сервиса.' },
-  { path: '/exchange', title: 'Биржевые котировки', description: 'Ключевые биржевые индикаторы по зерновым.' },
-  { path: '/duties', title: 'Страница пошлин', description: 'Экспортные и внутренние пошлины по культурам.' },
   { path: '/rail-tariffs', title: 'Страница ж/д данных', description: 'Тарифы и ограничения по железнодорожным перевозкам.' },
   { path: '/routes', title: 'Маршруты', description: 'Типовые маршруты отгрузки и сроки доставки.' },
   { path: '/organizations', title: 'Каталог организаций', description: 'Компании рынка, статусы и специализация.' },
   { path: '/analytics/tariffs', title: 'Тарифы аналитики', description: 'Планы и условия подключения аналитических продуктов.' },
-  { path: '/analytics/demo', title: 'Демо-аналитика', description: 'Демонстрация индексов, прогнозов и сигналов.' },
-  { path: '/analytics/subscription', title: 'Управление подпиской', description: 'Активные услуги, продление и настройки уведомлений.' },
+  { path: '/analytics/signals', title: 'Сигналы по посевам', description: 'Погодные, агрономические и региональные факторы влияния на урожай и цену.' },
+  { path: '/analytics/demo', title: 'Пример отчета', description: 'Структура аналитического отчета и примеры доступных блоков.' },
+  { path: '/analytics/subscription', title: 'Подписка на аналитику', description: 'Настройка доступа к обзорам, сигналам, прогнозам и уведомлениям.' },
   { path: '/prices/archive', title: 'Архив цен', description: 'История цен за недели и месяцы.' },
 ];
-

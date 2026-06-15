@@ -1,8 +1,11 @@
-import { create } from 'zustand';
+import { create } from "zustand";
 import {
+  AuctionSummary,
   CartItem,
   DeliveryMode,
   EquipmentLot,
+  ForumExpertApplication,
+  ForumExpertProfile,
   ForumReply,
   ForumPost,
   NewsArticle,
@@ -14,104 +17,384 @@ import {
   SellerApplication,
   SubscriptionState,
   UserProfile,
-} from '../types/domain';
-import { portalApi } from '../services/portalApi';
-import { clearSession, setSession } from '../services/session';
+  ServiceLot,
+} from "../types/domain";
+import { portalApi } from "../services/portalApi";
+import { clearSession, setSession } from "../services/session";
 
 interface AppState {
   users: UserProfile[];
   currentUserId: string;
   grainLots: GrainLot[];
   equipmentLots: EquipmentLot[];
+  serviceLots: ServiceLot[];
+  auctionSummaries: AuctionSummary[];
   news: NewsArticle[];
   prices: PriceRecord[];
-  analytics: Array<{ month: string; ndvi: number; ssi: number; priceForecast: number; demand: number; supply: number }>;
+  analytics: Array<{
+    month: string;
+    ndvi: number;
+    ssi: number;
+    priceForecast: number;
+    demand: number;
+    supply: number;
+  }>;
   cart: CartItem[];
   orders: Order[];
   posts: ForumPost[];
   replies: ForumReply[];
+  forumReplyReactions: Record<string, { likes: number; dislikes: number }>;
   notifications: NotificationItem[];
   sellerApplications: SellerApplication[];
   subscription: SubscriptionState;
-  referenceCatalogs: Record<string, Array<{ id: string; slug: string; title: string; summary: string; region: string; details: string; contacts: string; status: string; highlights: string[] }>>;
+  referenceCatalogs: Record<
+    string,
+    Array<{
+      id: string;
+      slug: string;
+      title: string;
+      summary: string;
+      region: string;
+      details: string;
+      contacts: string;
+      status: string;
+      highlights: string[];
+    }>
+  >;
+  forumExpertApplications: ForumExpertApplication[];
+  forumExperts: ForumExpertProfile[];
+  forumTopicViews: Record<string, number>;
 
   loadAll: () => Promise<void>;
   setCurrentUser: (userId: string) => Promise<void>;
   addToCart: (lot: GrainLot | EquipmentLot) => Promise<void>;
   updateCartQuantity: (itemId: string, quantity: number) => Promise<void>;
   removeCartItem: (itemId: string) => Promise<void>;
-  checkout: (payment: PaymentMethod, deliveryMode: DeliveryMode, deliveryPrice: number) => Promise<Order>;
-  submitSellerApplication: (payload: Omit<SellerApplication, 'id' | 'status' | 'submittedAt'>) => Promise<void>;
+  checkout: (
+    payment: PaymentMethod,
+    deliveryMode: DeliveryMode,
+    deliveryPrice: number,
+  ) => Promise<Order>;
+  submitSellerApplication: (
+    payload: Omit<SellerApplication, "id" | "status" | "submittedAt">,
+  ) => Promise<void>;
   approveApplication: (applicationId: string) => Promise<void>;
-  addGrainLot: (payload: Omit<GrainLot, 'id' | 'createdAt'>) => Promise<void>;
-  addEquipmentLot: (payload: Omit<EquipmentLot, 'id' | 'createdAt'>) => Promise<void>;
-  addPost: (payload: Omit<ForumPost, 'id' | 'createdAt'>) => Promise<void>;
-  addReply: (payload: Omit<ForumReply, 'id' | 'createdAt'>) => Promise<void>;
-  activateSubscription: (plan: 'monthly' | 'yearly') => Promise<void>;
-  calculateDelivery: (distance: number, volume: number, mode: DeliveryMode) => number;
+  addGrainLot: (payload: Omit<GrainLot, "id" | "createdAt">) => Promise<void>;
+  addEquipmentLot: (
+    payload: Omit<EquipmentLot, "id" | "createdAt">,
+  ) => Promise<void>;
+  addServiceLot: (
+    payload: Omit<ServiceLot, "id" | "createdAt">,
+  ) => Promise<void>;
+  addPost: (payload: Omit<ForumPost, "id" | "createdAt">) => Promise<void>;
+  addReply: (payload: Omit<ForumReply, "id" | "createdAt">) => Promise<string>;
+  voteForumReply: (replyId: string, vote: "like" | "dislike") => void;
+  submitForumExpertApplication: (
+    payload: Omit<
+      ForumExpertApplication,
+      "id" | "status" | "createdAt" | "reviewedAt" | "reviewerName"
+    >,
+  ) => Promise<void>;
+  updateForumExpertApplication: (
+    applicationId: string,
+    payload: Omit<
+      ForumExpertApplication,
+      "id" | "status" | "createdAt" | "reviewedAt" | "reviewerName"
+    >,
+  ) => Promise<void>;
+  withdrawForumExpertApplication: (applicationId: string) => Promise<void>;
+  approveForumExpertApplication: (applicationId: string) => Promise<void>;
+  rejectForumExpertApplication: (applicationId: string) => Promise<void>;
+  markForumTopicViewed: (topicId: string) => void;
+  activateSubscription: (plan: "basic" | "professional" | "corporate") => Promise<void>;
+  calculateDelivery: (
+    distance: number,
+    volume: number,
+    mode: DeliveryMode,
+  ) => number;
   markNotificationsRead: () => Promise<void>;
 }
 
-const referenceCategories = ['countries', 'cultures', 'organizations', 'routes', 'rail-tariffs', 'duties', 'exchange'] as const;
+const referenceCategories = [
+  "countries",
+  "cultures",
+  "organizations",
+  "routes",
+  "rail-tariffs",
+  "duties",
+  "exchange",
+] as const;
+const forumStorageKey = "zernoagromir-forum-v1";
 
-function normalizeRole(role: string): 'buyer' | 'seller' {
-  return role.toLowerCase() === 'seller' ? 'seller' : 'buyer';
+function canUseStorage() {
+  return (
+    typeof window !== "undefined" && typeof window.localStorage !== "undefined"
+  );
 }
 
-function normalizeGrainType(value: string): GrainLot['grainType'] {
-  switch (value.toLowerCase()) {
-    case 'barley':
-      return 'Ячмень';
-    case 'corn':
-      return 'Кукуруза';
-    case 'rye':
-      return 'Рожь';
-    case 'oat':
-      return 'Овес';
-    default:
-      return 'Пшеница';
+type ForumLocalState = {
+  topicViews: Record<string, number>;
+  expertApplications: ForumExpertApplication[];
+  pendingReplies: ForumReply[];
+  replyVotesByUser: Record<string, Record<string, "like" | "dislike">>;
+};
+
+type MarketplaceLocalState = {
+  serviceLots: ServiceLot[];
+};
+
+function isVolatileForumMediaUrl(url?: string) {
+  return Boolean(url && (url.startsWith("data:") || url.startsWith("blob:")));
+}
+
+function compactForumReplyForStorage(reply: ForumReply): ForumReply {
+  const attachments = reply.attachments
+    ?.map((attachment) =>
+      isVolatileForumMediaUrl(attachment.url)
+        ? { ...attachment, url: "" }
+        : attachment,
+    )
+    .filter((attachment) => Boolean(attachment.url));
+
+  return {
+    ...reply,
+    mediaUrl: isVolatileForumMediaUrl(reply.mediaUrl)
+      ? undefined
+      : reply.mediaUrl,
+    attachments: attachments?.length ? attachments : undefined,
+  };
+}
+
+function compactForumLocalStateForStorage(
+  state: ForumLocalState,
+): ForumLocalState {
+  return {
+    ...state,
+    pendingReplies: state.pendingReplies
+      .slice(0, 50)
+      .map(compactForumReplyForStorage),
+  };
+}
+
+function readForumLocalState(): ForumLocalState {
+  if (!canUseStorage()) {
+    return {
+      topicViews: {},
+      expertApplications: [],
+      pendingReplies: [],
+      replyVotesByUser: {},
+    };
+  }
+
+  try {
+    const raw = window.localStorage.getItem(forumStorageKey);
+    if (!raw) {
+      return {
+        topicViews: {},
+        expertApplications: [],
+        pendingReplies: [],
+        replyVotesByUser: {},
+      };
+    }
+
+    const parsed = JSON.parse(raw) as Partial<ForumLocalState>;
+    return {
+      topicViews:
+        parsed.topicViews && typeof parsed.topicViews === "object"
+          ? (parsed.topicViews as Record<string, number>)
+          : {},
+      expertApplications: Array.isArray(parsed.expertApplications)
+        ? (parsed.expertApplications as ForumExpertApplication[])
+        : [],
+      pendingReplies: Array.isArray(parsed.pendingReplies)
+        ? (parsed.pendingReplies as ForumReply[])
+        : [],
+      replyVotesByUser:
+        parsed.replyVotesByUser && typeof parsed.replyVotesByUser === "object"
+          ? (parsed.replyVotesByUser as Record<
+              string,
+              Record<string, "like" | "dislike">
+            >)
+          : {},
+    };
+  } catch {
+    return {
+      topicViews: {},
+      expertApplications: [],
+      pendingReplies: [],
+      replyVotesByUser: {},
+    };
   }
 }
 
-function normalizeEquipmentCondition(value: string): EquipmentLot['condition'] {
-  return value.toLowerCase() === 'new' ? 'new' : 'used';
+function persistForumLocalState(state: ForumLocalState): ForumLocalState {
+  const compactState = compactForumLocalStateForStorage(state);
+  if (!canUseStorage()) return compactState;
+
+  try {
+    window.localStorage.setItem(forumStorageKey, JSON.stringify(compactState));
+  } catch (error) {
+    const emergencyState: ForumLocalState = {
+      ...compactState,
+      pendingReplies: compactState.pendingReplies.slice(0, 20).map((reply) => ({
+        ...reply,
+        mediaUrl: undefined,
+        mediaType: undefined,
+        mediaName: undefined,
+        attachments: undefined,
+      })),
+    };
+
+    try {
+      window.localStorage.setItem(
+        forumStorageKey,
+        JSON.stringify(emergencyState),
+      );
+      return emergencyState;
+    } catch {
+      console.warn("Не удалось сохранить локальное состояние форума", error);
+    }
+  }
+
+  return compactState;
+}
+
+function saveForumLocalState(
+  updater: (draft: ForumLocalState) => ForumLocalState,
+) {
+  const next = updater(readForumLocalState());
+  return persistForumLocalState(next);
+}
+
+function summarizeReplyVotes(
+  reply: ForumReply,
+  replyVotes: Record<string, "like" | "dislike"> | undefined,
+) {
+  let likes = reply.likes ?? 0;
+  let dislikes = reply.dislikes ?? 0;
+
+  Object.values(replyVotes ?? {}).forEach((vote) => {
+    if (vote === "like") {
+      likes += 1;
+    } else {
+      dislikes += 1;
+    }
+  });
+
+  return { likes, dislikes };
+}
+
+function mergeForumReplies(
+  replies: ForumReply[],
+  pendingReplies: ForumReply[],
+  replyVotesByUser: Record<string, Record<string, "like" | "dislike">>,
+) {
+  return [...replies, ...pendingReplies].map((reply) => ({
+    ...reply,
+    ...summarizeReplyVotes(reply, replyVotesByUser[reply.id]),
+  }));
+}
+
+function readMarketplaceLocalState(): MarketplaceLocalState {
+  if (!canUseStorage()) {
+    return { serviceLots: [] };
+  }
+
+  try {
+    const raw = window.localStorage.getItem("zernoagromir-marketplace-v1");
+    if (!raw) {
+      return { serviceLots: [] };
+    }
+    const parsed = JSON.parse(raw) as Partial<MarketplaceLocalState>;
+    return {
+      serviceLots: Array.isArray(parsed.serviceLots)
+        ? (parsed.serviceLots as ServiceLot[])
+        : [],
+    };
+  } catch {
+    return { serviceLots: [] };
+  }
+}
+
+function persistMarketplaceLocalState(state: MarketplaceLocalState) {
+  if (!canUseStorage()) return;
+  window.localStorage.setItem(
+    "zernoagromir-marketplace-v1",
+    JSON.stringify(state),
+  );
+}
+
+function normalizeRole(role: string): "buyer" | "seller" | "admin" {
+  if (role.toLowerCase() === "seller") return "seller";
+  if (role.toLowerCase() === "admin") return "admin";
+  return "buyer";
+}
+
+function normalizeGrainType(value: string): GrainLot["grainType"] {
+  switch (value.toLowerCase()) {
+    case "barley":
+      return "Ячмень";
+    case "corn":
+      return "Кукуруза";
+    case "rye":
+      return "Рожь";
+    case "oat":
+      return "Овес";
+    default:
+      return "Пшеница";
+  }
+}
+
+function normalizeEquipmentCondition(value: string): EquipmentLot["condition"] {
+  return value.toLowerCase() === "new" ? "new" : "used";
 }
 
 function normalizePaymentMethod(value: string): PaymentMethod {
   switch (value.toLowerCase()) {
-    case 'card':
-      return 'card';
-    case 'sbp':
-      return 'sbp';
+    case "card":
+      return "card";
+    case "sbp":
+      return "sbp";
     default:
-      return 'invoice';
+      return "invoice";
   }
 }
 
 function normalizeDeliveryMode(value: string): DeliveryMode {
   switch (value.toLowerCase()) {
-    case 'pickup':
-      return 'pickup';
-    case 'partnerdelivery':
-    case 'partner_delivery':
-      return 'partner_delivery';
+    case "pickup":
+      return "pickup";
+    case "partnerdelivery":
+    case "partner_delivery":
+      return "partner_delivery";
     default:
-      return 'seller_delivery';
+      return "seller_delivery";
   }
 }
 
-function normalizeOrderStatus(value: string): Order['status'] {
+function normalizeOrderStatus(value: string): Order["status"] {
   switch (value.toLowerCase()) {
-    case 'paid':
-      return 'paid';
-    case 'processing':
-      return 'processing';
+    case "paid":
+      return "paid";
+    case "processing":
+      return "processing";
     default:
-      return 'created';
+      return "created";
   }
 }
 
-function mapUser(user: { id: string; email: string; displayName: string; role: string; region: string; farmType: string; inn?: string | null; ogrn?: string | null; isVerifiedSeller: boolean; sellerVerificationStatus: string }): UserProfile {
+function mapUser(user: {
+  id: string;
+  email: string;
+  displayName: string;
+  role: string;
+  region: string;
+  farmType: string;
+  inn?: string | null;
+  ogrn?: string | null;
+  isVerifiedSeller: boolean;
+  sellerVerificationStatus: string;
+}): UserProfile {
   return {
     id: user.id,
     email: user.email,
@@ -124,6 +407,69 @@ function mapUser(user: { id: string; email: string; displayName: string; role: s
     isVerifiedSeller: user.isVerifiedSeller,
     sellerVerificationStatus: user.sellerVerificationStatus,
   };
+}
+
+function defaultForumExperts(): ForumExpertProfile[] {
+  return [
+    {
+      id: "expert-agro-1",
+      name: "СГАА",
+      section: "Агрономия",
+      specialization: "Севооборот и питание растений",
+      company: "Смоленская ГСХА",
+      bio: "Практика по агрономии, диагностике питания и сезонным рискам.",
+      rating: 4.9,
+      responseCount: 42,
+      verified: true,
+      contact: "expert@zernoagromir.ru",
+    },
+    {
+      id: "expert-trade-1",
+      name: "Эксперт портала",
+      section: "Торговля",
+      specialization: "Ценообразование, документы, договоры",
+      company: "Редакция ЗерноАгроМир",
+      bio: "Разбирает сделки, формулирует ответ по документам и логистике.",
+      rating: 4.8,
+      responseCount: 57,
+      verified: true,
+      contact: "market@zernoagromir.ru",
+    },
+    {
+      id: "expert-tech-1",
+      name: "Инженер-технолог",
+      section: "Техника",
+      specialization: "Хранение, ремонт, сервис",
+      company: "АгроТехСнаб",
+      bio: "Техническая эксплуатация, узлы и сервис сельхозтехники.",
+      rating: 4.7,
+      responseCount: 31,
+      verified: true,
+      contact: "service@zernoagromir.ru",
+    },
+  ];
+}
+
+function deriveForumExperts(
+  applications: ForumExpertApplication[],
+): ForumExpertProfile[] {
+  const approved = applications
+    .filter((application) => application.status === "approved")
+    .map<ForumExpertProfile>((application, index) => ({
+      id: `application-${application.id}`,
+      userId: application.userId,
+      name: application.userName,
+      section: application.section,
+      specialization: application.specialization,
+      company: application.experienceSummary || "Проверенный участник",
+      bio: application.proof,
+      rating: 4.6 + Math.min(index * 0.05, 0.25),
+      responseCount: 10 + index * 3,
+      verified: true,
+      contact: application.contact,
+    }));
+
+  return [...defaultForumExperts(), ...approved];
 }
 
 function mapGrainLot(lot: {
@@ -149,7 +495,7 @@ function mapGrainLot(lot: {
 }): GrainLot {
   return {
     id: lot.id,
-    category: 'grain',
+    category: "grain",
     sellerId: lot.sellerId,
     sellerName: lot.sellerName,
     title: lot.title,
@@ -186,7 +532,7 @@ function mapEquipmentLot(lot: {
 }): EquipmentLot {
   return {
     id: lot.id,
-    category: 'equipment',
+    category: "equipment",
     sellerId: lot.sellerId,
     sellerName: lot.sellerName,
     title: lot.title,
@@ -201,11 +547,107 @@ function mapEquipmentLot(lot: {
   };
 }
 
-function mapCartItem(item: { id: string; lotId: string; category: string; lotTitle: string; sellerName: string; unitPrice: number; quantity: number; subtotal: number }): CartItem {
+function mapServiceLot(lot: {
+  id: string;
+  sellerId: string;
+  sellerName: string;
+  title: string;
+  serviceType: string;
+  region: string;
+  unit: string;
+  price: number;
+  description: string;
+  coverImageUrl?: string | null;
+  attachments?: Array<{
+    id: string;
+    name: string;
+    type: "image" | "video" | "file";
+    url: string;
+    mimeType?: string;
+    size?: number;
+  }>;
+  createdAt: string;
+  tags?: string[];
+}): ServiceLot {
+  return {
+    id: lot.id,
+    category: "service",
+    sellerId: lot.sellerId,
+    sellerName: lot.sellerName,
+    title: lot.title,
+    serviceType: lot.serviceType,
+    region: lot.region,
+    unit: lot.unit,
+    price: lot.price,
+    description: lot.description,
+    coverImageUrl: lot.coverImageUrl ?? undefined,
+    attachments: lot.attachments?.map((attachment) => ({
+      id: attachment.id,
+      name: attachment.name,
+      type: attachment.type,
+      url: attachment.url,
+      mimeType: attachment.mimeType,
+      size: attachment.size,
+    })),
+    createdAt: lot.createdAt,
+    tags: lot.tags,
+  };
+}
+
+function mapAuctionSummary(auction: {
+  lotId: string;
+  lotTitle: string;
+  startingPrice: number;
+  currentHighestBid: number;
+  minimumStep: number;
+  sellerName: string;
+  startsAtUtc: string;
+  endsAtUtc: string;
+  status: string;
+  bidsCount: number;
+  leadingUserId?: string | null;
+  leadingUserName?: string | null;
+  winningUserId?: string | null;
+  winningUserName?: string | null;
+  winningBidId?: string | null;
+  lastBidAtUtc?: string | null;
+  isEnded: boolean;
+}): AuctionSummary {
+  return {
+    lotId: auction.lotId,
+    lotTitle: auction.lotTitle,
+    startingPrice: Number(auction.startingPrice),
+    currentHighestBid: Number(auction.currentHighestBid),
+    minimumStep: Number(auction.minimumStep),
+    sellerName: auction.sellerName,
+    startsAtUtc: auction.startsAtUtc,
+    endsAtUtc: auction.endsAtUtc,
+    status: auction.status,
+    bidsCount: auction.bidsCount,
+    leadingUserId: auction.leadingUserId ?? undefined,
+    leadingUserName: auction.leadingUserName ?? undefined,
+    winningUserId: auction.winningUserId ?? undefined,
+    winningUserName: auction.winningUserName ?? undefined,
+    winningBidId: auction.winningBidId ?? undefined,
+    lastBidAtUtc: auction.lastBidAtUtc ?? undefined,
+    isEnded: auction.isEnded,
+  };
+}
+
+function mapCartItem(item: {
+  id: string;
+  lotId: string;
+  category: string;
+  lotTitle: string;
+  sellerName: string;
+  unitPrice: number;
+  quantity: number;
+  subtotal: number;
+}): CartItem {
   return {
     id: item.id,
     lotId: item.lotId,
-    category: item.category.toLowerCase() as CartItem['category'],
+    category: item.category.toLowerCase() as CartItem["category"],
     quantity: item.quantity,
     lotTitle: item.lotTitle,
     sellerName: item.sellerName,
@@ -217,7 +659,16 @@ function mapCartItem(item: { id: string; lotId: string; category: string; lotTit
 function mapOrder(order: {
   id: string;
   userId: string;
-  items: Array<{ id: string; lotId: string; category: string; lotTitle: string; sellerName: string; unitPrice: number; quantity: number; subtotal: number }>;
+  items: Array<{
+    id: string;
+    lotId: string;
+    category: string;
+    lotTitle: string;
+    sellerName: string;
+    unitPrice: number;
+    quantity: number;
+    subtotal: number;
+  }>;
   paymentMethod: string;
   deliveryMode: string;
   deliveryPrice: number;
@@ -238,10 +689,10 @@ function mapOrder(order: {
   };
 }
 
-function mapForumSection(section: string): ForumPost['section'] {
-  if (section === 'Agrology') return 'Агрономия';
-  if (section === 'Equipment') return 'Техника';
-  return 'Торговля';
+function mapForumSection(section: string): ForumPost["section"] {
+  if (section === "Agrology") return "Агрономия";
+  if (section === "Equipment") return "Техника";
+  return "Торговля";
 }
 
 function mapForumTopic(topic: {
@@ -253,6 +704,14 @@ function mapForumTopic(topic: {
   content: string;
   tags: string[];
   mediaUrl?: string | null;
+  attachments?: Array<{
+    id: string;
+    name: string;
+    type: "image" | "video" | "file";
+    url: string;
+    mimeType?: string | null;
+    size?: number | null;
+  }>;
   verifiedAnswer?: string | null;
   createdAt: string;
 }): ForumPost {
@@ -265,12 +724,35 @@ function mapForumTopic(topic: {
     content: topic.content,
     tags: topic.tags,
     mediaUrl: topic.mediaUrl ?? undefined,
+    attachments: topic.attachments?.map((attachment) => ({
+      id: attachment.id,
+      name: attachment.name,
+      type: attachment.type,
+      url: attachment.url,
+      mimeType: attachment.mimeType ?? undefined,
+      size: attachment.size ?? undefined,
+    })),
     createdAt: topic.createdAt,
     verifiedAnswer: topic.verifiedAnswer ?? undefined,
   };
 }
 
-function mapForumReply(reply: { id: string; topicId: string; authorName: string; rating: number; content: string; createdAt: string }): ForumReply {
+function mapForumReply(reply: {
+  id: string;
+  topicId: string;
+  authorName: string;
+  rating: number;
+  content: string;
+  createdAt: string;
+  attachments?: Array<{
+    id: string;
+    name: string;
+    type: "image" | "video" | "file";
+    url: string;
+    mimeType?: string | null;
+    size?: number | null;
+  }>;
+}): ForumReply {
   return {
     id: reply.id,
     postId: reply.topicId,
@@ -278,10 +760,27 @@ function mapForumReply(reply: { id: string; topicId: string; authorName: string;
     rating: reply.rating,
     content: reply.content,
     createdAt: reply.createdAt,
+    attachments: reply.attachments?.map((attachment) => ({
+      id: attachment.id,
+      name: attachment.name,
+      type: attachment.type,
+      url: attachment.url,
+      mimeType: attachment.mimeType ?? undefined,
+      size: attachment.size ?? undefined,
+    })),
+    likes: 0,
+    dislikes: 0,
+    status: "published",
   };
 }
 
-function mapNotification(notification: { id: string; userId: string; message: string; viewed: boolean; createdAt: string }): NotificationItem {
+function mapNotification(notification: {
+  id: string;
+  userId: string;
+  message: string;
+  viewed: boolean;
+  createdAt: string;
+}): NotificationItem {
   return {
     id: notification.id,
     userId: notification.userId,
@@ -291,7 +790,16 @@ function mapNotification(notification: { id: string; userId: string; message: st
   };
 }
 
-function mapSellerApplication(app: { id: string; userId: string; inn: string; ogrn: string; companyName: string; docPhotoUrl: string; status: string; submittedAt: string }): SellerApplication {
+function mapSellerApplication(app: {
+  id: string;
+  userId: string;
+  inn: string;
+  ogrn: string;
+  companyName: string;
+  docPhotoUrl: string;
+  status: string;
+  submittedAt: string;
+}): SellerApplication {
   return {
     id: app.id,
     userId: app.userId,
@@ -299,21 +807,46 @@ function mapSellerApplication(app: { id: string; userId: string; inn: string; og
     ogrn: app.ogrn,
     companyName: app.companyName,
     docPhotoUrl: app.docPhotoUrl,
-    status: app.status.toLowerCase() as SellerApplication['status'],
+    status: app.status.toLowerCase() as SellerApplication["status"],
     submittedAt: app.submittedAt,
   };
 }
 
-function mapSubscription(subscription: { userId: string; isActive: boolean; plan: string | null; expiresAt: string | null }): SubscriptionState {
+function normalizeSubscriptionPlan(plan: string | null | undefined): SubscriptionState["plan"] {
+  const normalized = plan?.toLowerCase();
+  if (!normalized) return null;
+  if (normalized === 'corporate' || normalized === 'enterprise') return 'corporate';
+  if (normalized === 'professional' || normalized === 'pro' || normalized === 'yearly' || normalized === 'quarterly') return 'professional';
+  return 'basic';
+}
+
+function mapSubscription(subscription: {
+  userId: string;
+  isActive: boolean;
+  plan: string | null;
+  expiresAt: string | null;
+}): SubscriptionState {
   return {
     isActive: subscription.isActive,
-    plan: subscription.plan?.toLowerCase() as SubscriptionState['plan'],
+    plan: normalizeSubscriptionPlan(subscription.plan),
     expiresAt: subscription.expiresAt,
   };
 }
 
-function mapNewsArticle(article: { id: string; section: string; title: string; lead: string; date: string; country: string; culture: string; region: string; type: string; imageUrl?: string | null }): NewsArticle {
-  const section = article.section === 'Мировые новости' ? 'Новости СНГ' : article.section;
+function mapNewsArticle(article: {
+  id: string;
+  section: string;
+  title: string;
+  lead: string;
+  date: string;
+  country: string;
+  culture: string;
+  region: string;
+  type: string;
+  imageUrl?: string | null;
+}): NewsArticle {
+  const section =
+    article.section === "Мировые новости" ? "Новости СНГ" : article.section;
   return {
     id: article.id,
     section,
@@ -328,7 +861,13 @@ function mapNewsArticle(article: { id: string; section: string; title: string; l
   };
 }
 
-function mapPriceRecord(record: { id: string; culture: string; region: string; day: number; weekChange: number }): PriceRecord {
+function mapPriceRecord(record: {
+  id: string;
+  culture: string;
+  region: string;
+  day: number;
+  weekChange: number;
+}): PriceRecord {
   return {
     id: record.id,
     culture: record.culture,
@@ -364,9 +903,11 @@ function mapReferenceCatalogItem(item: {
 
 export const useAppStore = create<AppState>((set, get) => ({
   users: [],
-  currentUserId: '',
+  currentUserId: "",
   grainLots: [],
   equipmentLots: [],
+  serviceLots: [],
+  auctionSummaries: [],
   news: [],
   prices: [],
   analytics: [],
@@ -374,29 +915,43 @@ export const useAppStore = create<AppState>((set, get) => ({
   orders: [],
   posts: [],
   replies: [],
+  forumReplyReactions: {},
   notifications: [],
   sellerApplications: [],
   subscription: { isActive: false, plan: null, expiresAt: null },
   referenceCatalogs: {},
+  forumExpertApplications: [],
+  forumExperts: defaultForumExperts(),
+  forumTopicViews: {},
 
   loadAll: async () => {
     const [snapshot, ...references] = await Promise.all([
       portalApi.getSnapshot(),
-      ...referenceCategories.map((category) => portalApi.getReferences(category)),
+      ...referenceCategories.map((category) =>
+        portalApi.getReferences(category),
+      ),
     ]);
 
     const users = snapshot.users.map(mapUser);
-    const currentUserId = snapshot.currentUserId && snapshot.currentUserId !== '00000000-0000-0000-0000-000000000000'
-      ? snapshot.currentUserId
-      : '';
+    const currentUserId =
+      snapshot.currentUserId &&
+      snapshot.currentUserId !== "00000000-0000-0000-0000-000000000000"
+        ? snapshot.currentUserId
+        : "";
+    const forumLocal = readForumLocalState();
+    const marketplaceLocal = readMarketplaceLocalState();
 
     setSession({ userId: currentUserId || null });
+
+    const forumTopics = snapshot.forumTopics.map(mapForumTopic);
+    const forumReplies = snapshot.forumReplies.map(mapForumReply);
 
     set({
       users,
       currentUserId,
       grainLots: snapshot.grainLots.map(mapGrainLot),
       equipmentLots: snapshot.equipmentLots.map(mapEquipmentLot),
+      auctionSummaries: snapshot.auctionSummaries.map(mapAuctionSummary),
       news: snapshot.news.map(mapNewsArticle),
       prices: snapshot.prices.map(mapPriceRecord),
       analytics: snapshot.analytics.map((point) => ({
@@ -409,12 +964,34 @@ export const useAppStore = create<AppState>((set, get) => ({
       })),
       cart: snapshot.cart.map(mapCartItem),
       orders: snapshot.orders.map(mapOrder),
-      posts: snapshot.forumTopics.map(mapForumTopic),
-      replies: snapshot.forumReplies.map(mapForumReply),
+      posts: forumTopics,
+      replies: mergeForumReplies(
+        forumReplies,
+        forumLocal.pendingReplies,
+        forumLocal.replyVotesByUser,
+      ),
       notifications: snapshot.notifications.map(mapNotification),
       sellerApplications: snapshot.sellerApplications.map(mapSellerApplication),
       subscription: mapSubscription(snapshot.subscription),
-      referenceCatalogs: Object.fromEntries(referenceCategories.map((category, index) => [category, references[index].map(mapReferenceCatalogItem)])),
+      referenceCatalogs: Object.fromEntries(
+        referenceCategories.map((category, index) => [
+          category,
+          references[index].map(mapReferenceCatalogItem),
+        ]),
+      ),
+      forumExpertApplications: forumLocal.expertApplications,
+      forumExperts: deriveForumExperts(forumLocal.expertApplications),
+      forumTopicViews: forumLocal.topicViews,
+      forumReplyReactions: Object.fromEntries(
+        [...forumReplies, ...forumLocal.pendingReplies].map((reply) => {
+          const counts = summarizeReplyVotes(
+            reply,
+            forumLocal.replyVotesByUser[reply.id],
+          );
+          return [reply.id, counts];
+        }),
+      ),
+      serviceLots: marketplaceLocal.serviceLots.map(mapServiceLot),
     });
   },
 
@@ -425,6 +1002,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   addToCart: async (lot) => {
+    if (lot.sellerId === get().currentUserId) {
+      throw new Error("Нельзя купить собственный лот");
+    }
     await portalApi.cartAdd({ lotId: lot.id, quantity: 1 });
     await get().loadAll();
   },
@@ -475,14 +1055,251 @@ export const useAppStore = create<AppState>((set, get) => ({
     await get().loadAll();
   },
 
+  addServiceLot: async (payload) => {
+    const lot: ServiceLot = {
+      ...payload,
+      id: crypto.randomUUID(),
+      createdAt: new Date().toISOString(),
+      category: "service",
+    };
+
+    const next = (() => {
+      const current = readMarketplaceLocalState();
+      return { serviceLots: [lot, ...current.serviceLots] };
+    })();
+
+    persistMarketplaceLocalState(next);
+    set({ serviceLots: next.serviceLots });
+  },
+
   addPost: async (payload) => {
     await portalApi.createTopic(payload);
     await get().loadAll();
   },
 
   addReply: async (payload) => {
-    await portalApi.createReply(payload);
-    await get().loadAll();
+    const reply: ForumReply = {
+      ...payload,
+      id: crypto.randomUUID(),
+      createdAt: new Date().toISOString(),
+      likes: payload.likes ?? 0,
+      dislikes: payload.dislikes ?? 0,
+      status: payload.status ?? "pending",
+    };
+
+    const next = saveForumLocalState((state) => ({
+      topicViews: state.topicViews,
+      expertApplications: state.expertApplications,
+      pendingReplies: [reply, ...state.pendingReplies],
+      replyVotesByUser: state.replyVotesByUser,
+    }));
+    const mergedReply = {
+      ...reply,
+      ...summarizeReplyVotes(reply, next.replyVotesByUser[reply.id]),
+    };
+
+    set({
+      replies: [
+        mergedReply,
+        ...get().replies.filter((item) => item.id !== reply.id),
+      ],
+      forumReplyReactions: {
+        ...get().forumReplyReactions,
+        [reply.id]: {
+          likes: mergedReply.likes ?? 0,
+          dislikes: mergedReply.dislikes ?? 0,
+        },
+      },
+    });
+
+    return reply.id;
+  },
+
+  voteForumReply: (replyId, vote) => {
+    const currentUserId = get().currentUserId || "anonymous";
+    const next = saveForumLocalState((state) => {
+      const currentVotes = state.replyVotesByUser[replyId] ?? {};
+      const previousVote = currentVotes[currentUserId];
+      if (previousVote === vote) {
+        return state;
+      }
+
+      return {
+        topicViews: state.topicViews,
+        expertApplications: state.expertApplications,
+        pendingReplies: state.pendingReplies,
+        replyVotesByUser: {
+          ...state.replyVotesByUser,
+          [replyId]: {
+            ...currentVotes,
+            [currentUserId]: vote,
+          },
+        },
+      };
+    });
+
+    set((state) => ({
+      forumReplyReactions: Object.fromEntries(
+        state.replies.map((reply) => {
+          const counts = summarizeReplyVotes(
+            reply,
+            next.replyVotesByUser[reply.id],
+          );
+          return [reply.id, counts];
+        }),
+      ),
+      replies: state.replies.map((reply) => {
+        if (reply.id !== replyId) return reply;
+        const reactions = summarizeReplyVotes(
+          reply,
+          next.replyVotesByUser[reply.id],
+        );
+        return {
+          ...reply,
+          likes: reactions.likes,
+          dislikes: reactions.dislikes,
+        };
+      }),
+    }));
+  },
+
+  submitForumExpertApplication: async (payload) => {
+    const application: ForumExpertApplication = {
+      ...payload,
+      id: crypto.randomUUID(),
+      status: "pending",
+      createdAt: new Date().toISOString(),
+    };
+
+    const next = saveForumLocalState((state) => ({
+      topicViews: state.topicViews,
+      expertApplications: [application, ...state.expertApplications],
+      pendingReplies: state.pendingReplies,
+      replyVotesByUser: state.replyVotesByUser,
+    }));
+
+    set({
+      forumExpertApplications: next.expertApplications,
+      forumExperts: deriveForumExperts(next.expertApplications),
+    });
+  },
+
+  updateForumExpertApplication: async (applicationId, payload) => {
+    const next = saveForumLocalState((state) => ({
+      topicViews: state.topicViews,
+      expertApplications: state.expertApplications.map((application) =>
+        application.id === applicationId
+          ? {
+              ...application,
+              ...payload,
+              status:
+                application.status === "approved"
+                  ? application.status
+                  : "pending",
+              reviewedAt:
+                application.status === "approved"
+                  ? application.reviewedAt
+                  : undefined,
+              reviewerName:
+                application.status === "approved"
+                  ? application.reviewerName
+                  : undefined,
+            }
+          : application,
+      ),
+      pendingReplies: state.pendingReplies,
+      replyVotesByUser: state.replyVotesByUser,
+    }));
+
+    set({
+      forumExpertApplications: next.expertApplications,
+      forumExperts: deriveForumExperts(next.expertApplications),
+    });
+  },
+
+  withdrawForumExpertApplication: async (applicationId) => {
+    const next = saveForumLocalState((state) => ({
+      topicViews: state.topicViews,
+      expertApplications: state.expertApplications.map((application) =>
+        application.id === applicationId
+          ? {
+              ...application,
+              status: "withdrawn",
+              reviewedAt: new Date().toISOString(),
+              reviewerName: application.reviewerName ?? "Пользователь",
+            }
+          : application,
+      ),
+      pendingReplies: state.pendingReplies,
+      replyVotesByUser: state.replyVotesByUser,
+    }));
+
+    set({
+      forumExpertApplications: next.expertApplications,
+      forumExperts: deriveForumExperts(next.expertApplications),
+    });
+  },
+
+  approveForumExpertApplication: async (applicationId) => {
+    const currentUser = get().users.find(
+      (user) => user.id === get().currentUserId,
+    );
+    const next = saveForumLocalState((state) => ({
+      topicViews: state.topicViews,
+      expertApplications: state.expertApplications.map((application) =>
+        application.id === applicationId
+          ? {
+              ...application,
+              status: "approved",
+              reviewedAt: new Date().toISOString(),
+              reviewerName: currentUser?.name ?? "Модератор",
+            }
+          : application,
+      ),
+      pendingReplies: state.pendingReplies,
+      replyVotesByUser: state.replyVotesByUser,
+    }));
+
+    set({
+      forumExpertApplications: next.expertApplications,
+      forumExperts: deriveForumExperts(next.expertApplications),
+    });
+  },
+
+  rejectForumExpertApplication: async (applicationId) => {
+    const next = saveForumLocalState((state) => ({
+      topicViews: state.topicViews,
+      expertApplications: state.expertApplications.map((application) =>
+        application.id === applicationId
+          ? {
+              ...application,
+              status: "rejected",
+              reviewedAt: new Date().toISOString(),
+            }
+          : application,
+      ),
+      pendingReplies: state.pendingReplies,
+      replyVotesByUser: state.replyVotesByUser,
+    }));
+
+    set({
+      forumExpertApplications: next.expertApplications,
+      forumExperts: deriveForumExperts(next.expertApplications),
+    });
+  },
+
+  markForumTopicViewed: (topicId) => {
+    const next = saveForumLocalState((state) => ({
+      topicViews: {
+        ...state.topicViews,
+        [topicId]: (state.topicViews[topicId] ?? 0) + 1,
+      },
+      expertApplications: state.expertApplications,
+      pendingReplies: state.pendingReplies,
+      replyVotesByUser: state.replyVotesByUser,
+    }));
+
+    set({ forumTopicViews: next.topicViews });
   },
 
   activateSubscription: async (plan) => {

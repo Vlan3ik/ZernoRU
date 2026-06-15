@@ -1,5 +1,5 @@
-﻿export type GrainType = 'Пшеница' | 'Ячмень' | 'Кукуруза' | 'Рожь' | 'Овес';
-export type LotCategory = 'grain' | 'equipment';
+export type GrainType = 'Пшеница' | 'Ячмень' | 'Кукуруза' | 'Рожь' | 'Овес';
+export type LotCategory = 'grain' | 'equipment' | 'service';
 export type VerificationStatus = 'pending' | 'approved' | 'rejected';
 export type PaymentMethod = 'card' | 'sbp' | 'invoice';
 export type DeliveryMode = 'pickup' | 'seller_delivery' | 'partner_delivery';
@@ -9,7 +9,7 @@ export interface UserProfile {
   id: string;
   email: string;
   name: string;
-  role: 'buyer' | 'seller';
+  role: 'buyer' | 'seller' | 'admin';
   region: string;
   farmType: string;
   inn?: string;
@@ -67,7 +67,54 @@ export interface EquipmentLot {
   createdAt: string;
 }
 
-export type MarketplaceLot = GrainLot | EquipmentLot;
+export interface ServiceLot {
+  id: string;
+  category: 'service';
+  sellerId: string;
+  sellerName: string;
+  title: string;
+  serviceType: string;
+  region: string;
+  unit: string;
+  price: number;
+  description: string;
+  coverImageUrl?: string;
+  attachments?: ForumAttachment[];
+  createdAt: string;
+  tags?: string[];
+}
+
+export interface AuctionSummary {
+  lotId: string;
+  lotTitle: string;
+  startingPrice: number;
+  currentHighestBid: number;
+  minimumStep: number;
+  sellerName: string;
+  startsAtUtc: string;
+  endsAtUtc: string;
+  status: string;
+  bidsCount: number;
+  leadingUserId?: string;
+  leadingUserName?: string;
+  winningUserId?: string;
+  winningUserName?: string;
+  winningBidId?: string;
+  lastBidAtUtc?: string;
+  isEnded: boolean;
+}
+
+export interface AuctionBid {
+  id: string;
+  auctionLotId: string;
+  userId: string;
+  userName: string;
+  amount: number;
+  createdAtUtc: string;
+  isWinning: boolean;
+}
+
+export type MarketplaceLot = GrainLot | EquipmentLot | ServiceLot;
 
 export interface CartItem {
   id: string;
@@ -109,9 +156,11 @@ export interface CourseMaterial {
   provider: string;
 }
 
+export type SubscriptionPlanCode = 'basic' | 'professional' | 'corporate';
+
 export interface SubscriptionState {
   isActive: boolean;
-  plan: 'monthly' | 'yearly' | null;
+  plan: SubscriptionPlanCode | null;
   expiresAt: string | null;
 }
 
@@ -154,6 +203,9 @@ export interface ForumPost {
   content: string;
   tags: string[];
   mediaUrl?: string;
+  mediaType?: 'image' | 'video' | 'file';
+  mediaName?: string;
+  attachments?: ForumAttachment[];
   createdAt: string;
   verifiedAnswer?: string;
 }
@@ -161,10 +213,61 @@ export interface ForumPost {
 export interface ForumReply {
   id: string;
   postId: string;
+  authorId?: string;
   authorName: string;
   rating: number;
   content: string;
   createdAt: string;
+  replyToAuthorName?: string;
+  mediaUrl?: string;
+  mediaType?: 'image' | 'video' | 'file';
+  mediaName?: string;
+  attachments?: ForumAttachment[];
+  status?: 'pending' | 'published';
+  likes?: number;
+  dislikes?: number;
+}
+
+export type ForumSectionName = 'Агрономия' | 'Торговля' | 'Техника';
+
+export interface ForumExpertApplication {
+  id: string;
+  userId: string;
+  userName: string;
+  section: ForumSectionName;
+  topicId?: string;
+  specialization: string;
+  experienceYears: number;
+  experienceSummary: string;
+  proof: string;
+  contact: string;
+  status: 'pending' | 'approved' | 'rejected' | 'withdrawn';
+  createdAt: string;
+  reviewedAt?: string;
+  reviewerName?: string;
+}
+
+export interface ForumAttachment {
+  id: string;
+  name: string;
+  type: 'image' | 'video' | 'file';
+  url: string;
+  mimeType?: string;
+  size?: number;
+}
+
+export interface ForumExpertProfile {
+  id: string;
+  userId?: string;
+  name: string;
+  section: ForumSectionName;
+  specialization: string;
+  company: string;
+  bio: string;
+  rating: number;
+  responseCount: number;
+  verified: boolean;
+  contact?: string;
 }
 
 export interface NotificationItem {
@@ -176,8 +279,14 @@ export interface NotificationItem {
 }
 
 export interface SellerDocumentInput {
-  innKpp: string;
+  companyName: string;
+  inn: string;
+  kpp: string;
   ogrn: string;
+  bankName: string;
+  bankAccount: string;
+  bik: string;
+  docPhotoUrl: string;
   mercuryCertificate: string;
   declarationOfConformity: string;
   storageContract: string;

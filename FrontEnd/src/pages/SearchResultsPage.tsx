@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { globalSearchTabs } from '../data/portalContent';
 import { useAppStore } from '../store/appStore';
+import { priceSlugForRecord } from '../utils/price';
 
 export function SearchResultsPage() {
   const navigate = useNavigate();
@@ -21,7 +22,7 @@ export function SearchResultsPage() {
     const q = (currentQuery || '').toLowerCase();
     return {
       Новости: news.filter((item) => `${item.title} ${item.lead}`.toLowerCase().includes(q)).map((item) => ({ id: item.id, title: item.title, subtitle: item.section, path: `/news/${item.id}` })),
-      Цены: prices.filter((item) => item.culture.toLowerCase().includes(q) || item.region.toLowerCase().includes(q)).map((item) => ({ id: item.id, title: item.culture, subtitle: `${item.day.toLocaleString('ru-RU')} ₽/т`, path: `/prices/${item.culture.toLowerCase().includes('пшеница 3') ? 'pw-3' : item.culture.toLowerCase().includes('пшеница 4') ? 'pw-4' : item.culture.toLowerCase().includes('пшеница 5') ? 'pw-5' : item.culture.toLowerCase().includes('ячмень') ? 'barley' : item.culture.toLowerCase().includes('кукуруза') ? 'corn' : 'regions'}` })),
+      Цены: prices.filter((item) => item.culture.toLowerCase().includes(q) || item.region.toLowerCase().includes(q)).map((item) => ({ id: item.id, title: item.culture, subtitle: `${item.day.toLocaleString('ru-RU')} ₽/т`, path: `/prices/${priceSlugForRecord(item)}` })),
       Лоты: grainLots.filter((item) => `${item.title} ${item.description}`.toLowerCase().includes(q)).map((item) => ({ id: item.id, title: item.title, subtitle: `${item.pricePerTon.toLocaleString('ru-RU')} ₽/т`, path: `/marketplace/lot/${item.id}` })),
       Организации: [{ id: 'org-1', title: 'Каталог организаций зернового рынка', subtitle: 'Проверенные продавцы и сервисные компании', path: '/organizations' }],
       'Темы форума': posts.filter((item) => `${item.title} ${item.content}`.toLowerCase().includes(q)).map((item) => ({ id: item.id, title: item.title, subtitle: item.section, path: `/forum/topic/${item.id}` })),

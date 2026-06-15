@@ -27,19 +27,19 @@
     ]
   },
   "packageFolders": {
-    "/home/krl/.nuget/packages/": {}
+    "/root/.nuget/packages/": {}
   },
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "/home/krl/Документы/ZernoRU/Backend/src/Zerno.Application/Zerno.Application.csproj",
+      "projectUniqueName": "/src/src/Zerno.Application/Zerno.Application.csproj",
       "projectName": "Zerno.Application",
-      "projectPath": "/home/krl/Документы/ZernoRU/Backend/src/Zerno.Application/Zerno.Application.csproj",
-      "packagesPath": "/home/krl/.nuget/packages/",
-      "outputPath": "/home/krl/Документы/ZernoRU/Backend/src/Zerno.Application/obj/",
+      "projectPath": "/src/src/Zerno.Application/Zerno.Application.csproj",
+      "packagesPath": "/root/.nuget/packages/",
+      "outputPath": "/src/src/Zerno.Application/obj/",
       "projectStyle": "PackageReference",
       "configFilePaths": [
-        "/home/krl/.nuget/NuGet/NuGet.Config"
+        "/root/.nuget/NuGet/NuGet.Config"
       ],
       "originalTargetFrameworks": [
         "net8.0"
@@ -51,8 +51,8 @@
         "net8.0": {
           "targetAlias": "net8.0",
           "projectReferences": {
-            "/home/krl/Документы/ZernoRU/Backend/src/Zerno.Domain/Zerno.Domain.csproj": {
-              "projectPath": "/home/krl/Документы/ZernoRU/Backend/src/Zerno.Domain/Zerno.Domain.csproj"
+            "/src/src/Zerno.Domain/Zerno.Domain.csproj": {
+              "projectPath": "/src/src/Zerno.Domain/Zerno.Domain.csproj"
             }
           }
         }
@@ -61,6 +61,11 @@
         "warnAsError": [
           "NU1605"
         ]
+      },
+      "restoreAuditProperties": {
+        "enableAudit": "true",
+        "auditLevel": "low",
+        "auditMode": "direct"
       }
     },
     "frameworks": {
@@ -82,7 +87,7 @@
             "privateAssets": "all"
           }
         },
-        "runtimeIdentifierGraphPath": "/usr/lib64/dotnet/sdk/8.0.127/PortableRuntimeIdentifierGraph.json"
+        "runtimeIdentifierGraphPath": "/usr/share/dotnet/sdk/8.0.422/PortableRuntimeIdentifierGraph.json"
       }
     }
   }

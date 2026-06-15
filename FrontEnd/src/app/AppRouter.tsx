@@ -1,4 +1,4 @@
-﻿import { Navigate, Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes } from 'react-router-dom';
 import { AppShell } from '../components/layout/AppShell';
 import { AdminPage } from '../pages/AdminPage';
 import { AuthPage } from '../pages/AuthPage';
@@ -12,19 +12,19 @@ import {
 } from '../pages/CatalogDetailPages';
 import { CountriesPage, CulturesPage, DirectoriesPage } from '../pages/CatalogPages';
 import { ForumCreateTopicPage, ForumPage, ForumSectionPage, ForumTopicPage } from '../pages/ForumPage';
+import { ForumExpertApplicationsPage } from '../pages/ForumExpertApplicationsPage';
 import { HomePage } from '../pages/HomePage';
 import { LogisticsPage } from '../pages/LogisticsPage';
 import { LotDetailPage } from '../pages/LotDetailPage';
 import { MarketplacePage } from '../pages/MarketplacePage';
+import { MarketplaceCreateLotPage } from '../pages/MarketplaceCreateLotPage';
 import { NewsDetailPage, NewsPage } from '../pages/NewsPage';
 import { PriceDetailPage, PricesPage } from '../pages/PricesPage';
 import { ReferenceCatalogPage } from '../pages/ReferenceCatalogPage';
 import { SearchResultsPage } from '../pages/SearchResultsPage';
 import { SellerVerificationPage } from '../pages/SellerRegistrationPage';
 import {
-  AnalyticsDemoPage,
-  AnalyticsSubscriptionPage,
-  AnalyticsTariffsPage,
+  AuctionInfoPage,
   BillingPage,
   buildStaticSections,
   CartPage,
@@ -33,22 +33,26 @@ import {
   ContentArticlePage,
   DealsPage,
   DocumentsPage,
-  FavoritesPage,
   HelpPage,
-  MessagesPage,
   NotificationsPage,
   OrderDetailPage,
   OrdersPage,
   PriceArchivePage,
 } from '../pages/ServicePages';
-import { AnalyticsPage } from '../pages/SubscriptionPage';
+import {
+  AnalyticsDemoPage,
+  AnalyticsPage,
+  AnalyticsSignalsPage,
+  AnalyticsSubscriptionPage,
+  AnalyticsTariffsPage,
+} from '../pages/SubscriptionPage';
 
 export function AppRouter() {
   return (
     <AppShell>
       <Routes>
         <Route path="/auth" element={<AuthPage />} />
-        <Route path="/admin" element={<AdminPage />} />
+        <Route path="/admin/*" element={<AdminPage />} />
         <Route path="/" element={<HomePage />} />
 
         <Route path="/news" element={<NewsPage />} />
@@ -59,6 +63,7 @@ export function AppRouter() {
         <Route path="/prices/:slug" element={<PriceDetailPage />} />
 
         <Route path="/marketplace" element={<MarketplacePage />} />
+        <Route path="/marketplace/create-lot" element={<MarketplaceCreateLotPage />} />
         <Route path="/marketplace/lot/:lotId" element={<LotDetailPage />} />
 
         <Route path="/directories" element={<DirectoriesPage />} />
@@ -78,10 +83,13 @@ export function AppRouter() {
         <Route path="/forum/section/:sectionId" element={<ForumSectionPage />} />
         <Route path="/forum/topic/:topicId" element={<ForumTopicPage />} />
         <Route path="/forum/new" element={<ForumCreateTopicPage />} />
+        <Route path="/forum/applications" element={<ForumExpertApplicationsPage />} />
 
         <Route path="/analytics" element={<AnalyticsPage />} />
+        <Route path="/analytics/signals" element={<AnalyticsSignalsPage />} />
         <Route path="/analytics/tariffs" element={<AnalyticsTariffsPage />} />
         <Route path="/analytics/demo" element={<AnalyticsDemoPage />} />
+        <Route path="/analytics/report-example" element={<AnalyticsDemoPage />} />
         <Route path="/analytics/subscription" element={<AnalyticsSubscriptionPage />} />
 
         <Route path="/cabinet" element={<CabinetPage />} />
@@ -89,15 +97,16 @@ export function AppRouter() {
         <Route path="/seller-verification" element={<SellerVerificationPage />} />
 
         <Route path="/search" element={<SearchResultsPage />} />
+        <Route path="/auction-info" element={<AuctionInfoPage />} />
 
         <Route path="/cart" element={<CartPage />} />
         <Route path="/checkout" element={<CheckoutPage />} />
         <Route path="/orders" element={<OrdersPage />} />
         <Route path="/orders/:orderId" element={<OrderDetailPage />} />
         <Route path="/deals" element={<DealsPage />} />
-        <Route path="/favorites" element={<FavoritesPage />} />
+        <Route path="/favorites" element={<Navigate to="/marketplace" replace />} />
         <Route path="/compare" element={<ComparePage />} />
-        <Route path="/messages" element={<MessagesPage />} />
+        <Route path="/messages" element={<Navigate to="/notifications" replace />} />
         <Route path="/documents" element={<DocumentsPage />} />
         <Route path="/billing" element={<BillingPage />} />
         <Route path="/notifications" element={<NotificationsPage />} />
@@ -111,46 +120,11 @@ export function AppRouter() {
         <Route path="/privacy" element={<ContentArticlePage title="Политика конфиденциальности" sections={buildStaticSections('Политика конфиденциальности')} />} />
         <Route path="/terms" element={<ContentArticlePage title="Пользовательское соглашение" sections={buildStaticSections('Пользовательское соглашение')} />} />
 
-        <Route
-          path="/exchange"
-          element={
-            <ReferenceCatalogPage
-              category="exchange"
-              title="Биржевые котировки"
-              description="Ключевые биржевые ориентиры по зерновому рынку, загруженные из backend snapshot."
-            />
-          }
-        />
-        <Route
-          path="/exchange/:slug"
-          element={
-            <ReferenceCatalogPage
-              category="exchange"
-              title="Биржевые котировки"
-              description="Ключевые биржевые ориентиры по зерновому рынку, загруженные из backend snapshot."
-            />
-          }
-        />
-        <Route
-          path="/duties"
-          element={
-            <ReferenceCatalogPage
-              category="duties"
-              title="Пошлины"
-              description="Экспортные и внутренние пошлины по культурам и направлениям."
-            />
-          }
-        />
-        <Route
-          path="/duties/:slug"
-          element={
-            <ReferenceCatalogPage
-              category="duties"
-              title="Пошлины"
-              description="Экспортные и внутренние пошлины по культурам и направлениям."
-            />
-          }
-        />
+        <Route path="/exchange" element={<Navigate to="/prices" replace />} />
+        <Route path="/exchange/:slug" element={<Navigate to="/prices" replace />} />
+        <Route path="/duties" element={<Navigate to="/prices" replace />} />
+        <Route path="/duties/:slug" element={<Navigate to="/prices" replace />} />
+
         <Route
           path="/rail-tariffs"
           element={

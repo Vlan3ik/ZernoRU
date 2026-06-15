@@ -3,8 +3,14 @@ import { Alert, List, Space, Tag, Typography } from 'antd';
 import { SellerDocumentInput } from '../../types/domain';
 
 const LABELS: Record<keyof SellerDocumentInput, string> = {
-  innKpp: 'ИНН/КПП',
+  companyName: 'Название организации',
+  inn: 'ИНН',
+  kpp: 'КПП',
   ogrn: 'ОГРН/ОГРНИП',
+  bankName: 'Банк',
+  bankAccount: 'Расчетный счет',
+  bik: 'БИК',
+  docPhotoUrl: 'Ссылка на документы',
   mercuryCertificate: 'Сертификат ФГИС "Меркурий"',
   declarationOfConformity: 'Декларация о соответствии',
   storageContract: 'Договор хранения',
@@ -66,4 +72,3 @@ export function SellerDocumentChecklist({ values, missingFields }: SellerDocumen
     </Space>
   );
 }
-

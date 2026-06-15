@@ -47,9 +47,14 @@ function App() {
       locale={ruRU}
       theme={{
         token: {
-          colorPrimary: '#2f6f3e',
-          borderRadius: 12,
-          fontFamily: '"PT Sans", "Segoe UI", sans-serif',
+          colorPrimary: '#2e8b4b',
+          colorSuccess: '#1f8a45',
+          colorInfo: '#2e7de0',
+          colorWarning: '#d9a52c',
+          colorError: '#d94e4e',
+          borderRadius: 14,
+          borderRadiusLG: 18,
+          fontFamily: 'Inter, "SF Pro Display", "Segoe UI", Roboto, Arial, sans-serif',
         },
       }}
     >

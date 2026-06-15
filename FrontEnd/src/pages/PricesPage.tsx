@@ -1,4 +1,4 @@
-﻿import { AreaChartOutlined } from '@ant-design/icons';
+import { AreaChartOutlined } from '@ant-design/icons';
 import { Button, Card, Col, Empty, Row, Select, Space, Table, Tag, Typography } from 'antd';
 import { useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -14,16 +14,7 @@ import {
 } from 'recharts';
 import { useAppStore } from '../store/appStore';
 import { NewsArticle, PriceRecord } from '../types/domain';
-
-function slugForPrice(record: PriceRecord) {
-  const title = record.culture.toLowerCase();
-  if (title.includes('пшеница 3')) return 'pw-3';
-  if (title.includes('пшеница 4')) return 'pw-4';
-  if (title.includes('пшеница 5')) return 'pw-5';
-  if (title.includes('ячмень')) return 'barley';
-  if (title.includes('кукуруза')) return 'corn';
-  return `${record.culture}-${record.region}`.toLowerCase().replace(/\s+/g, '-');
-}
+import { priceSlugForRecord } from '../utils/price';
 
 function buildTrendSeries(record: PriceRecord) {
   const baseline = record.day - record.weekChange * 2.1;
@@ -39,7 +30,7 @@ function buildTrendSeries(record: PriceRecord) {
 
 function resolvePriceRecord(prices: PriceRecord[], slug?: string): PriceRecord | undefined {
   if (!slug || slug === 'regions') return prices[0];
-  return prices.find((item) => slugForPrice(item) === slug) ?? prices[0];
+  return prices.find((item) => priceSlugForRecord(item) === slug) ?? prices[0];
 }
 
 function summarizeRecord(record: PriceRecord) {
@@ -72,7 +63,7 @@ export function PricesPage() {
   return (
     <Space direction="vertical" size={24} style={{ width: '100%' }}>
       <Card className="section-card">
-        <Typography.Title level={1}>Цены и котировки</Typography.Title>
+        <Typography.Title level={1}>Цены</Typography.Title>
         <Typography.Paragraph className="lead-text">
           Snapshot подгружает реальные рыночные записи, а карточка detail рисует график и связанные материалы без заглушек.
         </Typography.Paragraph>
@@ -117,7 +108,7 @@ export function PricesPage() {
           const delta = row.day - week;
           return (
             <Col key={row.id} xs={24} md={12} xl={8}>
-              <Card className="metric-card" onClick={() => navigate(`/prices/${slugForPrice(row)}`)}>
+              <Card className="metric-card" onClick={() => navigate(`/prices/${priceSlugForRecord(row)}`)}>
                 <Typography.Text className="metric-title">{row.culture}</Typography.Text>
                 <Typography.Title level={2}>{row.day.toLocaleString('ru-RU')} ₽/т</Typography.Title>
                 <Space wrap>
@@ -164,7 +155,7 @@ export function PricesPage() {
               title: 'Детально',
               key: 'action',
               render: (_, row) => (
-                <Button type="link" onClick={() => navigate(`/prices/${slugForPrice(row)}`)}>
+                <Button type="link" onClick={() => navigate(`/prices/${priceSlugForRecord(row)}`)}>
                   Открыть
                 </Button>
               ),
@@ -188,8 +179,6 @@ export function PriceDetailPage() {
   const otherRows = useMemo(() => prices.filter((item) => item.id !== row?.id).slice(0, 6), [prices, row]);
   const related = useMemo(() => (row ? relatedNews(news, row) : []), [news, row]);
 
-  const exchangeItems = references.exchange?.slice(0, 4) ?? [];
-  const dutiesItems = references['duties']?.slice(0, 4) ?? [];
   const railItems = references['rail-tariffs']?.slice(0, 4) ?? [];
 
   if (!row && slug !== 'regions') {
@@ -200,7 +189,7 @@ export function PriceDetailPage() {
     return (
       <Space direction="vertical" size={24} style={{ width: '100%' }}>
         <Card>
-          <Typography.Link onClick={() => navigate('/prices')}>Цены и котировки</Typography.Link>
+          <Typography.Link onClick={() => navigate('/prices')}>Цены</Typography.Link>
           <Typography.Title level={1}>Пшеница по регионам</Typography.Title>
           <Typography.Paragraph className="lead-text">
             Сводная страница по регионам строится из backend snapshot и показывает распределение цен по всей выборке.
@@ -219,7 +208,7 @@ export function PriceDetailPage() {
               {
                 title: 'Детально',
                 key: 'action',
-                render: (_, record) => <Button type="link" onClick={() => navigate(`/prices/${slugForPrice(record)}`)}>Открыть</Button>,
+                render: (_, record) => <Button type="link" onClick={() => navigate(`/prices/${priceSlugForRecord(record)}`)}>Открыть</Button>,
               },
             ]}
           />
@@ -234,7 +223,7 @@ export function PriceDetailPage() {
   return (
     <Space direction="vertical" size={24} style={{ width: '100%' }}>
       <Card>
-        <Typography.Link onClick={() => navigate('/prices')}>Цены и котировки</Typography.Link>
+        <Typography.Link onClick={() => navigate('/prices')}>Цены</Typography.Link>
         <Typography.Title level={1}>{row!.culture}</Typography.Title>
         <Space wrap>
           <Tag color="green">Текущая цена {row!.day.toLocaleString('ru-RU')} ₽/т</Tag>
@@ -283,28 +272,6 @@ export function PriceDetailPage() {
         </Col>
 
         <Col xs={24} xl={9}>
-          <Card title="Биржевые котировки">
-            <Space direction="vertical" size={8}>
-              {exchangeItems.length ? exchangeItems.map((item) => (
-                <Card key={item.id} size="small" className="nested-card">
-                  <Typography.Text strong>{item.title}</Typography.Text>
-                  <Typography.Paragraph type="secondary" style={{ marginBottom: 0 }}>{item.summary}</Typography.Paragraph>
-                </Card>
-              )) : <Typography.Text type="secondary">Данные биржи загружаются из справочника.</Typography.Text>}
-            </Space>
-          </Card>
-
-          <Card title="Пошлины" style={{ marginTop: 16 }}>
-            <Space direction="vertical" size={8}>
-              {dutiesItems.length ? dutiesItems.map((item) => (
-                <Card key={item.id} size="small" className="nested-card">
-                  <Typography.Text strong>{item.title}</Typography.Text>
-                  <Typography.Paragraph type="secondary" style={{ marginBottom: 0 }}>{item.summary}</Typography.Paragraph>
-                </Card>
-              )) : <Typography.Text type="secondary">Данные по пошлинам загружаются из справочника.</Typography.Text>}
-            </Space>
-          </Card>
-
           <Card title="Ж/д тарифы" style={{ marginTop: 16 }}>
             <Space direction="vertical" size={8}>
               {railItems.length ? railItems.map((item) => (
@@ -319,7 +286,7 @@ export function PriceDetailPage() {
           <Card title="Другие цены" style={{ marginTop: 16 }}>
             <Space direction="vertical" size={8}>
               {otherRows.map((item) => (
-                <Button key={item.id} type="link" onClick={() => navigate(`/prices/${slugForPrice(item)}`)} style={{ padding: 0, height: 'auto' }}>
+                <Button key={item.id} type="link" onClick={() => navigate(`/prices/${priceSlugForRecord(item)}`)} style={{ padding: 0, height: 'auto' }}>
                   {item.culture} · {item.region}
                 </Button>
               ))}

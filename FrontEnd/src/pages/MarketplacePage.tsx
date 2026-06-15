@@ -1,33 +1,18 @@
-﻿import {
+import {
   CheckCircleOutlined,
   ClockCircleOutlined,
   DownloadOutlined,
   FilterOutlined,
-  HeartOutlined,
   LoginOutlined,
   PhoneOutlined,
   ShoppingCartOutlined,
 } from '@ant-design/icons';
-import {
-  AutoComplete,
-  Button,
-  Card,
-  Col,
-  Empty,
-  InputNumber,
-  Modal,
-  Row,
-  Select,
-  Space,
-  Switch,
-  Tag,
-  Typography,
-  message,
-} from 'antd';
+import { AutoComplete, Button, Card, Col, DatePicker, Empty, Form, Input, InputNumber, Modal, Row, Select, Space, Switch, Tag, Typography, message } from 'antd';
 import { ReactNode, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAppStore } from '../store/appStore';
-import { EquipmentLot, GrainLot, UserProfile } from '../types/domain';
+import { portalApi } from '../services/portalApi';
+import { AuctionSummary, EquipmentLot, GrainLot, UserProfile } from '../types/domain';
 import { lotImageMap, serviceImageMap } from '../data/mediaAssets';
 
 type MarketplaceTab = 'grain' | 'equipment' | 'services';
@@ -39,14 +24,19 @@ interface ServiceCardData {
   description: string;
   region: string;
   priceFrom: number;
+  sellerName?: string;
+  sellerId?: string;
+  coverImageUrl?: string;
+  unit?: string;
+  source: 'static' | 'custom';
 }
 
 const serviceOffers: ServiceCardData[] = [
-  { id: 'srv-1', title: 'Перевозка зерна автотранспортом', description: 'Маршруты по ЦФО и ЮФО, подача в течение 24 часов.', region: 'ЦФО', priceFrom: 940 },
-  { id: 'srv-2', title: 'Хранение на элеваторе', description: 'Партии от 50 тонн, контроль влажности и температуры.', region: 'ЮФО', priceFrom: 210 },
-  { id: 'srv-3', title: 'Лабораторный анализ качества', description: 'Протеин, клейковина, натура, зараженность и микотоксины.', region: 'ПФО', priceFrom: 1800 },
-  { id: 'srv-4', title: 'Страхование поставки', description: 'Защита от рисков по перевозке и хранению партии.', region: 'Россия', priceFrom: 3200 },
-  { id: 'srv-5', title: 'Сопровождение сделки', description: 'Юридическая проверка документов и договоров поставки.', region: 'Россия', priceFrom: 6500 },
+  { id: 'srv-1', title: 'Перевозка зерна автотранспортом', description: 'Маршруты по ЦФО и ЮФО, подача в течение 24 часов.', region: 'ЦФО', priceFrom: 940, source: 'static' },
+  { id: 'srv-2', title: 'Хранение на элеваторе', description: 'Партии от 50 тонн, контроль влажности и температуры.', region: 'ЮФО', priceFrom: 210, source: 'static' },
+  { id: 'srv-3', title: 'Лабораторный анализ качества', description: 'Протеин, клейковина, натура, зараженность и микотоксины.', region: 'ПФО', priceFrom: 1800, source: 'static' },
+  { id: 'srv-4', title: 'Страхование поставки', description: 'Защита от рисков по перевозке и хранению партии.', region: 'Россия', priceFrom: 3200, source: 'static' },
+  { id: 'srv-5', title: 'Сопровождение сделки', description: 'Юридическая проверка документов и договоров поставки.', region: 'Россия', priceFrom: 6500, source: 'static' },
 ];
 
 const categoryTabs: Array<{ key: MarketplaceTab; label: string; icon: ReactNode }> = [
@@ -100,8 +90,11 @@ function downloadDocs(lot: GrainLot | EquipmentLot) {
 export function MarketplacePage() {
   const grainLots = useAppStore((state) => state.grainLots);
   const equipmentLots = useAppStore((state) => state.equipmentLots);
+  const serviceLots = useAppStore((state) => state.serviceLots);
+  const auctionSummaries = useAppStore((state) => state.auctionSummaries);
   const users = useAppStore((state) => state.users);
   const addToCart = useAppStore((state) => state.addToCart);
+  const currentUserId = useAppStore((state) => state.currentUserId);
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
 
@@ -120,15 +113,20 @@ export function MarketplacePage() {
   const [priceTo, setPriceTo] = useState<number | undefined>();
   const [contactOpen, setContactOpen] = useState(false);
   const [contactSeller, setContactSeller] = useState<UserProfile | null>(null);
+  const [serviceRequestOpen, setServiceRequestOpen] = useState(false);
+  const [selectedService, setSelectedService] = useState<ServiceCardData | null>(null);
+  const [serviceForm] = Form.useForm();
+
+  const currentUser = users.find((item) => item.id === currentUserId) ?? null;
 
   const sellerMap = useMemo(() => users.reduce<Record<string, UserProfile>>((acc, user) => ({ ...acc, [user.id]: user }), {}), [users]);
 
   const searchOptions = useMemo(() => {
     const sellers = users.map((user) => ({ value: user.name, label: `Продавец: ${user.name}` }));
     const cultures = [...new Set(grainLots.map((lot) => lot.grainType))].map((item) => ({ value: item, label: `Культура: ${item}` }));
-    const regions = [...new Set([...grainLots.map((lot) => lot.region), ...equipmentLots.map((lot) => lot.region), ...serviceOffers.map((item) => item.region)])].map((item) => ({ value: item, label: `Регион: ${item}` }));
+    const regions = [...new Set([...grainLots.map((lot) => lot.region), ...equipmentLots.map((lot) => lot.region), ...serviceOffers.map((item) => item.region), ...serviceLots.map((item) => item.region)])].map((item) => ({ value: item, label: `Регион: ${item}` }));
     return [...sellers, ...cultures, ...regions];
-  }, [users, grainLots, equipmentLots]);
+  }, [users, grainLots, equipmentLots, serviceLots]);
 
   const filteredGrain = useMemo(
     () =>
@@ -144,11 +142,13 @@ export function MarketplacePage() {
         if (stockOnly && lot.volumeTons <= 0) return false;
         if (priceFrom !== undefined && lot.pricePerTon < priceFrom) return false;
         if (priceTo !== undefined && lot.pricePerTon > priceTo) return false;
+        const auction = auctionSummaries.find((item) => item.lotId === lot.id);
+        if (lot.auctionEnabled && auction?.isEnded) return false;
         if (mode === 'direct' && lot.auctionEnabled) return false;
         if (mode === 'auction' && !lot.auctionEnabled) return false;
         return true;
       }),
-    [culture, documentsOnly, grade, grainLots, mode, priceFrom, priceTo, query, region, sellerMap, stockOnly, verifiedOnly],
+    [auctionSummaries, culture, documentsOnly, grade, grainLots, mode, priceFrom, priceTo, query, region, sellerMap, stockOnly, verifiedOnly],
   );
 
   const filteredEquipment = useMemo(
@@ -163,17 +163,36 @@ export function MarketplacePage() {
         if (priceTo !== undefined && lot.price > priceTo) return false;
         return true;
       }),
-    [equipmentLots, mode, priceFrom, priceTo, query, region, sellerMap, verifiedOnly],
+    [equipmentLots, priceFrom, priceTo, query, region, sellerMap, verifiedOnly],
+  );
+
+  const marketplaceServices = useMemo<ServiceCardData[]>(
+    () => [
+      ...serviceOffers,
+      ...serviceLots.map((lot) => ({
+        id: lot.id,
+        title: lot.title,
+        description: `${lot.description}${lot.attachments?.length ? ` · ${lot.attachments.length} файлов` : ''}`,
+        region: lot.region,
+        priceFrom: lot.price,
+        sellerName: lot.sellerName,
+        sellerId: lot.sellerId,
+        coverImageUrl: lot.coverImageUrl,
+        unit: lot.unit,
+        source: 'custom' as const,
+      })),
+    ],
+    [serviceLots],
   );
 
   const filteredServices = useMemo(
     () =>
-      serviceOffers.filter((service) => {
-        if (query && !`${service.title} ${service.description} ${service.region}`.toLowerCase().includes(query.toLowerCase())) return false;
+      marketplaceServices.filter((service) => {
+        if (query && !`${service.title} ${service.description} ${service.region} ${service.sellerName ?? ''}`.toLowerCase().includes(query.toLowerCase())) return false;
         if (region && !service.region.includes(region)) return false;
         return true;
       }),
-    [query, region],
+    [marketplaceServices, query, region],
   );
 
   const activeResults = tab === 'grain' ? filteredGrain : tab === 'equipment' ? filteredEquipment : filteredServices;
@@ -197,8 +216,16 @@ export function MarketplacePage() {
   };
 
   const startDeal = async (lot: GrainLot | EquipmentLot) => {
-    await addToCart(lot);
-    navigate('/cart');
+    try {
+      if (lot.sellerId === currentUserId) {
+        message.warning('Нельзя купить собственный лот');
+        return;
+      }
+      await addToCart(lot);
+      navigate('/cart');
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : 'Не удалось добавить лот в корзину');
+    }
   };
 
   const topFilters = [
@@ -213,7 +240,7 @@ export function MarketplacePage() {
       <Card className="section-card marketplace-hero">
         <Row gutter={[24, 24]} align="middle">
           <Col xs={24} xl={12}>
-            <Space direction="vertical" size={16} className="marketplace-hero__copy">
+            <Space direction="vertical" size={18} className="marketplace-hero__copy">
               <Typography.Title level={1} className="marketplace-title">
                 Торговая площадка
               </Typography.Title>
@@ -221,12 +248,25 @@ export function MarketplacePage() {
                 Лоты проверенных продавцов: зерно, документы, логистика и сделки в одном экране.
               </Typography.Paragraph>
               <Space wrap>
-                <Button type="primary" size="large" icon={<ShoppingCartOutlined />} onClick={() => navigate('/marketplace?tab=grain')}>
+                <Button
+                  type="primary"
+                  size="large"
+                  icon={<ShoppingCartOutlined />}
+                  onClick={() => {
+                    if (!currentUser) {
+                      navigate('/auth');
+                      return;
+                    }
+                    navigate('/marketplace/create-lot');
+                  }}
+                >
                   Разместить лот
                 </Button>
-                <Button size="large" onClick={() => navigate('/auth')} icon={<LoginOutlined />}>
-                  Вход
-                </Button>
+                {!currentUser && (
+                  <Button size="large" onClick={() => navigate('/auth')} icon={<LoginOutlined />}>
+                    Вход
+                  </Button>
+                )}
               </Space>
             </Space>
           </Col>
@@ -234,16 +274,16 @@ export function MarketplacePage() {
           <Col xs={24} xl={12}>
             <Row gutter={[16, 16]} className="marketplace-hero__features">
               <Col xs={12} xl={12}>
-                <FeatureCard icon={<ShieldIcon />} title="Проверенные продавцы" text="Мы проверяем продавцов для вашей уверенности" />
+                <FeatureCard icon={<ShieldIcon />} title="Проверенные продавцы" text="Мы проверяем продавцов для вашей уверенности" variant="verified" />
               </Col>
               <Col xs={12} xl={12}>
-                <FeatureCard icon={<DocumentIcon />} title="С документами" text="Только лоты с полным пакетом документов" />
+                <FeatureCard icon={<DocumentIcon />} title="С документами" text="Только лоты с полным пакетом документов" variant="documents" />
               </Col>
               <Col xs={12} xl={12}>
-                <FeatureCard icon={<SearchGlyph />} title="Быстрый поиск" text="Удобные фильтры помогают найти лучшее предложение" />
+                <FeatureCard icon={<SearchGlyph />} title="Быстрый поиск" text="Удобные фильтры помогают найти лучшее предложение" variant="search" />
               </Col>
               <Col xs={12} xl={12}>
-                <FeatureCard icon={<WheatTruckIcon />} title="Зерно / Техника / Услуги" text="Широкий выбор категорий для вашего бизнеса" />
+                <FeatureCard icon={<WheatTruckIcon />} title="Зерно / Техника / Услуги" text="Широкий выбор категорий для вашего бизнеса" variant="market" />
               </Col>
             </Row>
           </Col>
@@ -409,6 +449,8 @@ export function MarketplacePage() {
                 <GrainLotCard
                   lot={lot}
                   isVerified={Boolean(sellerMap[lot.sellerId]?.isVerifiedSeller)}
+                  isOwnLot={lot.sellerId === currentUserId}
+                  auctionSummary={auctionSummaries.find((item) => item.lotId === lot.id) ?? null}
                   onContact={() => openContact(lot.sellerId)}
                   onDownload={() => downloadDocs(lot)}
                   onStartDeal={() => void startDeal(lot)}
@@ -425,6 +467,7 @@ export function MarketplacePage() {
                 <EquipmentLotCard
                   lot={lot}
                   isVerified={Boolean(sellerMap[lot.sellerId]?.isVerifiedSeller)}
+                  isOwnLot={lot.sellerId === currentUserId}
                   onContact={() => openContact(lot.sellerId)}
                   onDownload={() => downloadDocs(lot)}
                   onStartDeal={() => void startDeal(lot)}
@@ -438,7 +481,11 @@ export function MarketplacePage() {
           <Row gutter={[24, 24]}>
             {filteredServices.map((service) => (
               <Col key={service.id} xs={24} xl={12}>
-                <ServiceLotCard service={service} onContact={() => message.success('Запрос отправлен поставщику услуги')} />
+                <ServiceLotCard
+                  service={service}
+                  onContact={() => { if (!currentUser) { navigate('/auth'); return; } setSelectedService(service); serviceForm.setFieldsValue({ serviceTitle: service.title, region: service.region, organization: currentUser.name, email: currentUser.email }); setServiceRequestOpen(true); }}
+                  onOpen={service.source === 'custom' ? () => navigate(`/marketplace/lot/${service.id}`) : undefined}
+                />
               </Col>
             ))}
           </Row>
@@ -478,6 +525,67 @@ export function MarketplacePage() {
           <Typography.Text type="secondary">Продавец не найден.</Typography.Text>
         )}
       </Modal>
+
+      <Modal
+        title="Заявка на услугу"
+        open={serviceRequestOpen}
+        onCancel={() => setServiceRequestOpen(false)}
+        okText="Отправить заявку"
+        cancelText="Отмена"
+        onOk={async () => {
+          try {
+            const values = await serviceForm.validateFields();
+            await portalApi.createServiceRequest({
+              ...values,
+              sellerId: selectedService?.sellerId,
+              serviceTitle: selectedService?.title ?? values.serviceTitle,
+            });
+            message.success('Заявка по услуге создана. Уведомление отправлено.');
+            setServiceRequestOpen(false);
+            serviceForm.resetFields();
+          } catch {
+            message.error('Заполните обязательные поля заявки');
+          }
+        }}
+      >
+        <Form form={serviceForm} layout="vertical" initialValues={{ serviceTitle: selectedService?.title, region: selectedService?.region }}>
+          <Form.Item name="serviceTitle" label="Услуга">
+            <Input disabled />
+          </Form.Item>
+          <Row gutter={12}>
+            <Col xs={24} md={12}>
+              <Form.Item name="organization" label="Организация" rules={[{ required: true, message: 'Укажите организацию' }]}>
+                <Input placeholder="Название компании" />
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={12}>
+              <Form.Item name="region" label="Регион" rules={[{ required: true, message: 'Укажите регион' }]}>
+                <Input placeholder="Регион выполнения" />
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={12}>
+              <Form.Item name="phone" label="Телефон" rules={[{ required: true, message: 'Укажите телефон' }]}>
+                <Input placeholder="+7 (900) 000-00-00" />
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={12}>
+              <Form.Item name="email" label="Email" rules={[{ required: true, type: 'email', message: 'Укажите email' }]}>
+                <Input placeholder="mail@company.ru" />
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={12}>
+              <Form.Item name="date" label="Желаемая дата">
+                <DatePicker style={{ width: '100%' }} />
+              </Form.Item>
+            </Col>
+            <Col xs={24}>
+              <Form.Item name="details" label="Что нужно сделать" rules={[{ required: true, message: 'Опишите задачу' }]}>
+                <Input.TextArea rows={4} placeholder="Маршрут, объем, сроки, требования к документам" />
+              </Form.Item>
+            </Col>
+          </Row>
+        </Form>
+      </Modal>
     </Space>
   );
 }
@@ -485,12 +593,16 @@ export function MarketplacePage() {
 function GrainLotCard({
   lot,
   isVerified,
+  isOwnLot,
+  auctionSummary,
   onContact,
   onDownload,
   onStartDeal,
 }: {
   lot: GrainLot;
   isVerified: boolean;
+  isOwnLot: boolean;
+  auctionSummary: AuctionSummary | null;
   onContact: () => void;
   onDownload: () => void;
   onStartDeal: () => void;
@@ -499,10 +611,10 @@ function GrainLotCard({
   const hasDocs = Boolean(lot.mercuryCertificate && lot.declarationOfConformity && lot.storageContract);
   const region = splitRegion(lot.region);
   const total = lot.volumeTons * lot.pricePerTon;
-  const auctionBid = lot.auctionEnabled ? Math.round(lot.pricePerTon * 0.985) : null;
+  const auctionBid = lot.auctionEnabled ? Math.max(lot.pricePerTon, auctionSummary?.currentHighestBid ?? 0) : null;
 
   return (
-    <Card
+      <Card
       className="lot-card marketplace-lot-card marketplace-lot-card--clickable"
       onClick={() => navigate(`/marketplace/lot/${lot.id}`)}
       role="button"
@@ -514,15 +626,17 @@ function GrainLotCard({
         }
       }}
     >
-      <Row gutter={[20, 20]} align="top">
-        <Col xs={24} md={8}>
+      <Space direction="vertical" size={16} style={{ width: '100%' }}>
+        <div className="marketplace-lot-card__header">
           <div className="marketplace-lot-card__media">
             <img src={resolveLotImage(lot)} alt={lot.title} className="marketplace-lot-card__image" />
+            <div className="marketplace-lot-card__media-caption">
+              <Typography.Text type="secondary">{lot.auctionEnabled ? 'Начальная ставка' : 'Цена за тонну'}</Typography.Text>
+              <Typography.Text strong>{formatMoney(lot.pricePerTon)} ₽/т</Typography.Text>
+            </div>
           </div>
-        </Col>
 
-        <Col xs={24} md={16}>
-          <Space direction="vertical" size={14} style={{ width: '100%' }}>
+          <div className="marketplace-lot-card__intro">
             <Space wrap size={8} className="marketplace-lot-card__badges">
               <Tag color="green">{lot.grainType}</Tag>
               <Tag color="blue">{lot.grade}</Tag>
@@ -537,50 +651,47 @@ function GrainLotCard({
               {lot.title}
             </Typography.Title>
             <Typography.Paragraph className="marketplace-lot-card__description">{lot.description}</Typography.Paragraph>
+          </div>
+        </div>
 
-            <div className="marketplace-lot-card__metrics">
-              <MetricBox label="Цена за тонну" value={`${formatMoney(lot.pricePerTon)} ₽/т`} accent="green" />
-              <MetricBox label="Итого ориентир" value={`${formatMoney(total)} ₽`} accent="green" />
-              <MetricBox label="Регион и отгрузка" value={region.main} subValue={region.sub || 'Взять из карточки продавца'} accent="blue" />
-              <MetricBox label="Продавец" value={lot.sellerName} />
-              <MetricBox label="Качество" value={`${lot.qualityScore}/100`} subValue="высокий показатель" />
-              <MetricBox label="Документы" value={hasDocs ? 'Подтверждены' : 'Требуют проверки'} subValue={hasDocs ? 'ИНН · декларация · хранение' : 'Неполный пакет'} accent={hasDocs ? 'blue' : 'gold'} />
-            </div>
+        <div className="marketplace-lot-card__metrics">
+          <MetricBox label="Объем партии" value={`${formatMoney(lot.volumeTons)} т`} />
+          <MetricBox label="Итого ориентир" value={`${formatMoney(total)} ₽`} accent="green" />
+          <MetricBox label="Регион и отгрузка" value={region.main} subValue={region.sub || 'Взять из карточки продавца'} accent="blue" />
+          <MetricBox label="Продавец" value={lot.sellerName} />
+          <MetricBox label="Качество" value={`${lot.qualityScore}/100`} subValue="высокий показатель" />
+          <MetricBox label="Документы" value={hasDocs ? 'Подтверждены' : 'Требуют проверки'} subValue={hasDocs ? 'ИНН · декларация · хранение' : 'Неполный пакет'} accent={hasDocs ? 'blue' : 'gold'} />
+        </div>
 
-            <Space wrap size={8} className="marketplace-lot-card__chips">
-              <Tag color="green">Натура {lot.qualityScore + 678}</Tag>
-              <Tag color="gold">Влажн. 12.5%</Tag>
-              <Tag color="blue">Протеин 14.1%</Tag>
-              <Tag>СБП / счёт</Tag>
-            </Space>
+        <Space wrap size={8} className="marketplace-lot-card__chips">
+          <Tag color="green">Натура {lot.qualityScore + 678}</Tag>
+          <Tag color="gold">Влажн. 12.5%</Tag>
+          <Tag color="blue">Протеин 14.1%</Tag>
+          <Tag>СБП / счёт</Tag>
+        </Space>
 
-            <div className="marketplace-lot-card__panels">
-              <InfoPanel title="Документы и сделка" text={hasDocs ? 'Сертификаты, декларация и договор хранения готовы.' : 'Документы загружены частично и доступны на проверку.'} />
-              <InfoPanel title="Логистика" text={lot.hasOwnTransport ? 'Самовывоз или расчёт доставки партнёром.' : 'Доставка обсуждается с продавцом и перевозчиком.'} />
-              <InfoPanel
-                title={lot.auctionEnabled ? 'Аукцион' : 'Формат сделки'}
-                text={lot.auctionEnabled ? `Шаг ${formatMoney(Math.max(100, Math.round(lot.pricePerTon * 0.015)))} ₽` : 'Прямая продажа без ожидания торгов.'}
-                highlight={lot.auctionEnabled ? `${formatMoney(auctionBid ?? lot.pricePerTon)} ₽` : undefined}
-              />
-            </div>
+        <div className="marketplace-lot-card__panels">
+          <InfoPanel title="Документы и сделка" text={hasDocs ? 'Сертификаты, декларация и договор хранения готовы.' : 'Документы загружены частично и доступны на проверку.'} />
+          <InfoPanel title="Логистика" text={lot.hasOwnTransport ? 'Самовывоз или расчёт доставки партнёром.' : 'Доставка обсуждается с продавцом и перевозчиком.'} />
+          <InfoPanel
+            title={lot.auctionEnabled ? 'Аукцион' : 'Формат сделки'}
+            text={lot.auctionEnabled ? `Шаг ${formatMoney(auctionSummary?.minimumStep ?? Math.max(100, Math.round(lot.pricePerTon * 0.005)))} ₽ · торги идут на сервере` : 'Прямая продажа без ожидания торгов.'}
+            highlight={lot.auctionEnabled ? `${formatMoney(auctionBid ?? lot.pricePerTon)} ₽` : undefined}
+          />
+        </div>
 
-            <Space wrap className="marketplace-lot-card__actions">
-              <Button type="primary" icon={<ShoppingCartOutlined />} onClick={(event) => { event.stopPropagation(); onStartDeal(); }}>
-                Начать сделку
-              </Button>
-              <Button icon={<PhoneOutlined />} onClick={(event) => { event.stopPropagation(); onContact(); }}>
-                Связаться с продавцом
-              </Button>
-              <Button icon={<DownloadOutlined />} onClick={(event) => { event.stopPropagation(); onDownload(); }}>
-                Документы
-              </Button>
-              <Button icon={<HeartOutlined />} onClick={(event) => { event.stopPropagation(); message.success('Лот добавлен в избранное'); }}>
-                В избранное
-              </Button>
-            </Space>
-          </Space>
-        </Col>
-      </Row>
+        <Space wrap className="marketplace-lot-card__actions">
+          <Button type="primary" icon={<ShoppingCartOutlined />} disabled={isOwnLot} onClick={(event) => { event.stopPropagation(); onStartDeal(); }}>
+            {isOwnLot ? 'Ваш лот' : 'Начать сделку'}
+          </Button>
+          <Button icon={<PhoneOutlined />} onClick={(event) => { event.stopPropagation(); onContact(); }}>
+            Связаться с продавцом
+          </Button>
+          <Button icon={<DownloadOutlined />} onClick={(event) => { event.stopPropagation(); onDownload(); }}>
+            Документы
+          </Button>
+        </Space>
+      </Space>
     </Card>
   );
 }
@@ -588,12 +699,14 @@ function GrainLotCard({
 function EquipmentLotCard({
   lot,
   isVerified,
+  isOwnLot,
   onContact,
   onDownload,
   onStartDeal,
 }: {
   lot: EquipmentLot;
   isVerified: boolean;
+  isOwnLot: boolean;
   onContact: () => void;
   onDownload: () => void;
   onStartDeal: () => void;
@@ -614,15 +727,17 @@ function EquipmentLotCard({
         }
       }}
     >
-      <Row gutter={[20, 20]} align="top">
-        <Col xs={24} md={8}>
+      <Space direction="vertical" size={16} style={{ width: '100%' }}>
+        <div className="marketplace-lot-card__header">
           <div className="marketplace-lot-card__media">
             <img src={resolveLotImage(lot)} alt={lot.title} className="marketplace-lot-card__image" />
+            <div className="marketplace-lot-card__media-caption">
+              <Typography.Text type="secondary">Цена</Typography.Text>
+              <Typography.Text strong>{formatMoney(lot.price)} ₽</Typography.Text>
+            </div>
           </div>
-        </Col>
 
-        <Col xs={24} md={16}>
-          <Space direction="vertical" size={14} style={{ width: '100%' }}>
+          <div className="marketplace-lot-card__intro">
             <Space wrap size={8} className="marketplace-lot-card__badges">
               <Tag color="blue">{lot.brand}</Tag>
               <Tag>{lot.year} г.</Tag>
@@ -636,46 +751,43 @@ function EquipmentLotCard({
               {lot.title}
             </Typography.Title>
             <Typography.Paragraph className="marketplace-lot-card__description">{lot.description}</Typography.Paragraph>
+          </div>
+        </div>
 
-            <div className="marketplace-lot-card__metrics">
-              <MetricBox label="Цена" value={`${formatMoney(lot.price)} ₽`} accent="green" />
-              <MetricBox label="Регион" value={region.main} subValue={region.sub || 'По согласованию'} accent="blue" />
-              <MetricBox label="Продавец" value={lot.sellerName} />
-              <MetricBox label="Документы" value="ПСМ и договор" subValue="Подтверждены" accent="blue" />
-              <MetricBox label="Лизинг" value="Доступен" subValue="Срок 12-36 мес." />
-              <MetricBox label="Доставка" value="По согласованию" subValue="Рассчитывается в сделке" />
-            </div>
+        <div className="marketplace-lot-card__metrics">
+          <MetricBox label="Объем партии" value={`1 шт.`} />
+          <MetricBox label="Итого ориентир" value={`${formatMoney(lot.price)} ₽`} accent="green" />
+          <MetricBox label="Регион и отгрузка" value={region.main} subValue={region.sub || 'По согласованию'} accent="blue" />
+          <MetricBox label="Продавец" value={lot.sellerName} />
+          <MetricBox label="Качество" value={lot.condition === 'new' ? '100/100' : '87/100'} subValue={lot.condition === 'new' ? 'новая техника' : 'проверенная техника'} />
+          <MetricBox label="Документы" value="Подтверждены" subValue="ПСМ · договор" accent="blue" />
+        </div>
 
-            <Space wrap size={8} className="marketplace-lot-card__chips">
-              <Tag color="green">Гарантия</Tag>
-              <Tag color="gold">Предпродажная проверка</Tag>
-              <Tag color="blue">Документы</Tag>
-              <Tag>Безналичный расчёт</Tag>
-            </Space>
+        <Space wrap size={8} className="marketplace-lot-card__chips">
+          <Tag color="green">Гарантия</Tag>
+          <Tag color="gold">Предпродажная проверка</Tag>
+          <Tag color="blue">Документы</Tag>
+          <Tag>Безналичный расчёт</Tag>
+        </Space>
 
-            <div className="marketplace-lot-card__panels">
-              <InfoPanel title="Документы и сделка" text="ПСМ, договор и спецификация готовы к передаче." />
-              <InfoPanel title="Логистика" text="Доставка со склада, цена рассчитывается в сделке." />
-              <InfoPanel title="Состояние" text={lot.condition === 'new' ? 'Новая техника с гарантией.' : 'Проверенная техника с обслуживанием.'} />
-            </div>
+        <div className="marketplace-lot-card__panels">
+          <InfoPanel title="Документы и сделка" text="ПСМ, договор и спецификация готовы к передаче." />
+          <InfoPanel title="Логистика" text="Доставка со склада, цена рассчитывается в сделке." />
+          <InfoPanel title="Состояние" text={lot.condition === 'new' ? 'Новая техника с гарантией.' : 'Проверенная техника с обслуживанием.'} />
+        </div>
 
-            <Space wrap className="marketplace-lot-card__actions">
-              <Button type="primary" icon={<ShoppingCartOutlined />} onClick={(event) => { event.stopPropagation(); onStartDeal(); }}>
-                Начать сделку
-              </Button>
-              <Button icon={<PhoneOutlined />} onClick={(event) => { event.stopPropagation(); onContact(); }}>
-                Связаться с продавцом
-              </Button>
-              <Button icon={<DownloadOutlined />} onClick={(event) => { event.stopPropagation(); onDownload(); }}>
-                Документы
-              </Button>
-              <Button icon={<HeartOutlined />} onClick={(event) => { event.stopPropagation(); message.success('Лот добавлен в избранное'); }}>
-                В избранное
-              </Button>
-            </Space>
-          </Space>
-        </Col>
-      </Row>
+        <Space wrap className="marketplace-lot-card__actions">
+          <Button type="primary" icon={<ShoppingCartOutlined />} disabled={isOwnLot} onClick={(event) => { event.stopPropagation(); onStartDeal(); }}>
+            {isOwnLot ? 'Ваш лот' : 'Начать сделку'}
+          </Button>
+          <Button icon={<PhoneOutlined />} onClick={(event) => { event.stopPropagation(); onContact(); }}>
+            Связаться с продавцом
+          </Button>
+          <Button icon={<DownloadOutlined />} onClick={(event) => { event.stopPropagation(); onDownload(); }}>
+            Документы
+          </Button>
+        </Space>
+      </Space>
     </Card>
   );
 }
@@ -683,49 +795,56 @@ function EquipmentLotCard({
 function ServiceLotCard({
   service,
   onContact,
+  onOpen,
 }: {
   service: ServiceCardData;
   onContact: () => void;
+  onOpen?: () => void;
 }) {
   return (
-    <Card className="lot-card marketplace-lot-card">
-      <Row gutter={[20, 20]} align="top">
-        <Col xs={24} md={8}>
+    <Card className="lot-card marketplace-lot-card marketplace-lot-card--clickable" onClick={onOpen}>
+      <Space direction="vertical" size={16} style={{ width: '100%' }}>
+        <div className="marketplace-lot-card__header">
           <div className="marketplace-lot-card__media">
-            <img src={resolveServiceImage(service.id)} alt={service.title} className="marketplace-lot-card__image" />
+            <img src={service.coverImageUrl ?? resolveServiceImage(service.id)} alt={service.title} className="marketplace-lot-card__image" />
+            <div className="marketplace-lot-card__media-caption">
+              <Typography.Text type="secondary">{service.source === 'custom' ? 'Моя услуга' : 'Цена от'}</Typography.Text>
+              <Typography.Text strong>{formatMoney(service.priceFrom)} ₽</Typography.Text>
+            </div>
           </div>
-        </Col>
-        <Col xs={24} md={16}>
-          <Space direction="vertical" size={14} style={{ width: '100%' }}>
+          <div className="marketplace-lot-card__intro">
             <Space wrap size={8} className="marketplace-lot-card__badges">
               <Tag color="green">{service.region}</Tag>
               <Tag color="blue">Услуга</Tag>
+              {service.source === 'custom' && <Tag color="gold">Мой лот</Tag>}
             </Space>
             <Typography.Title level={3} className="marketplace-lot-card__title">
               {service.title}
             </Typography.Title>
             <Typography.Paragraph className="marketplace-lot-card__description">{service.description}</Typography.Paragraph>
+          </div>
+        </div>
 
-            <div className="marketplace-lot-card__metrics">
-              <MetricBox label="Цена от" value={`${formatMoney(service.priceFrom)} ₽`} accent="green" />
-              <MetricBox label="Регион" value={service.region} subValue="Работаем по заявке" accent="blue" />
-              <MetricBox label="Формат" value="Консультация" subValue="Под запрос" />
-              <MetricBox label="Документы" value="Договор" subValue="После согласования" accent="gold" />
-              <MetricBox label="Срок" value="1-2 дня" subValue="В зависимости от маршрута" />
-              <MetricBox label="Связь" value="Внутренний чат" subValue="Ответ в течение дня" />
-            </div>
+        <div className="marketplace-lot-card__metrics">
+          <MetricBox label="Цена от" value={`${formatMoney(service.priceFrom)} ₽`} accent="green" />
+          <MetricBox label="Регион" value={service.region} subValue="Работаем по заявке" accent="blue" />
+          <MetricBox label="Формат" value="Заявка" subValue="Согласование параметров" />
+          <MetricBox label="Документы" value="Договор" subValue="После согласования" accent="gold" />
+          <MetricBox label="Срок" value="1-2 дня" subValue="В зависимости от маршрута" />
+          <MetricBox label="Связь" value="Заявка" subValue="Контакты в уведомлении" />
+        </div>
 
-            <Space wrap className="marketplace-lot-card__actions">
-              <Button type="primary" icon={<PhoneOutlined />} onClick={onContact}>
-                Связаться с поставщиком
-              </Button>
-              <Button icon={<HeartOutlined />} onClick={() => message.success('Услуга добавлена в избранное')}>
-                В избранное
-              </Button>
-            </Space>
-          </Space>
-        </Col>
-      </Row>
+        <Space wrap className="marketplace-lot-card__actions">
+          {service.source === 'custom' && service.sellerName && (
+            <Button type="default" onClick={(event) => { event.stopPropagation(); onOpen?.(); }}>
+              Открыть
+            </Button>
+          )}
+          <Button type="primary" icon={<PhoneOutlined />} onClick={(event) => { event.stopPropagation(); onContact(); }}>
+            Оставить заявку
+          </Button>
+        </Space>
+      </Space>
     </Card>
   );
 }
@@ -774,9 +893,19 @@ function FilterSwitch({ checked, onChange, label }: { checked: boolean; onChange
   );
 }
 
-function FeatureCard({ icon, title, text }: { icon: ReactNode; title: string; text: string }) {
+function FeatureCard({
+  icon,
+  title,
+  text,
+  variant = 'default',
+}: {
+  icon: ReactNode;
+  title: string;
+  text: string;
+  variant?: 'default' | 'verified' | 'documents' | 'search' | 'market';
+}) {
   return (
-    <Card className="marketplace-feature-card">
+    <Card className={`marketplace-feature-card marketplace-feature-card--${variant}`}>
       <Space direction="vertical" size={10} align="center" style={{ width: '100%' }}>
         <div className="marketplace-feature-card__icon">{icon}</div>
         <Typography.Text strong className="marketplace-feature-card__title">

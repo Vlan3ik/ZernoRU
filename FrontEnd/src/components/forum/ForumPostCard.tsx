@@ -35,11 +35,17 @@ export function ForumPostCard({ post, replies, currentUserName, onReply }: Forum
         </Typography.Title>
         <Typography.Text>{post.content}</Typography.Text>
 
-        {post.mediaUrl && (
+        {post.attachments?.length ? (
+          <Space wrap size={[8, 8]}>
+            {post.attachments.map((attachment) => (
+              <Tag key={attachment.id}>{attachment.name}</Tag>
+            ))}
+          </Space>
+        ) : post.mediaUrl ? (
           <Typography.Link href={post.mediaUrl} target="_blank" rel="noreferrer">
             <LinkOutlined /> Открыть вложение
           </Typography.Link>
-        )}
+        ) : null}
 
         {post.verifiedAnswer && (
           <Card size="small" styles={{ body: { background: '#f6ffed' } }}>
@@ -103,4 +109,3 @@ export function ForumPostCard({ post, replies, currentUserName, onReply }: Forum
     </Card>
   );
 }
-

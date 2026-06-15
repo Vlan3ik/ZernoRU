@@ -1,7 +1,6 @@
-# ZernoRU
+# ЗерноАгроМир
 
-Полноценный full-stack портал для рынка зерна: витрина лотов, новости, цены, логистика, форум, личный кабинет, подписки, уведомления, админ-сводка и справочники.  
-`ReactDesign/` используется как дизайн-референс, а рабочее приложение собирается из `FrontEnd/` и `Backend/`.
+Полноценный full-stack портал для рынка зерна: витрина лотов, новости, цены, логистика, форум, личный кабинет, подписки, уведомления, админ-сводка и справочники.
 
 ## Стек
 
@@ -52,15 +51,15 @@
 ### Один compose
 
 ```bash
-docker compose up --build
+docker compose up -d --force-recreate
 ```
 
 После старта:
 
-- Frontend: [http://localhost:8080](http://localhost:8080)
-- API: [http://localhost:8080/api/health](http://localhost:8080/api/health)
-- MinIO Console: [http://localhost:9001](http://localhost:9001)
-- pgAdmin: [http://localhost:5050](http://localhost:5050)
+- Frontend/nginx: [http://localhost:18081](http://localhost:18081)
+- API через nginx: [http://localhost:18081/api/health](http://localhost:18081/api/health)
+- MinIO Console: [http://localhost:19001](http://localhost:19001)
+- pgAdmin: [http://localhost:15050](http://localhost:15050)
 
 ### Локальная разработка
 
@@ -99,7 +98,7 @@ npm test
 npm run build
 ```
 
-Для ручной проверки после `docker compose up --build`:
+Для ручной проверки после `docker compose up -d --force-recreate`:
 
 - открыть главную страницу и лоты
 - проверить вход через `/auth`
@@ -113,3 +112,35 @@ npm run build
 - `ReactDesign/` не участвует в продакшен-запуске.
 - Фронтенд работает через nginx и обращается к API по относительному `/api`.
 - Хранилище медиа и БД не требуют ручной инициализации.
+
+## Docker: быстрый dev-запуск и доступ из локальной сети
+
+Для локальной разработки не используйте `docker compose build --no-cache`. В текущей схеме compose запускает готовые образы и монтирует код. Запускайте так:
+
+```bash
+docker compose down
+docker compose up -d --force-recreate
+```
+
+На этом компьютере:
+
+```text
+http://localhost:18081
+```
+
+С телефона или другого устройства в той же сети:
+
+```text
+http://<IP-вашего-компьютера>:18081
+```
+
+Пример:
+
+```text
+http://192.168.1.50:18081
+```
+
+Все публичные порты Docker привязаны к `0.0.0.0`, поэтому портал доступен не только через localhost. Подробная инструкция: `LAN_ACCESS.md`.
+
+Первый запуск frontend может показать `Installing frontend npm packages...` — это установка зависимостей в Docker volume. После первого успешного запуска зависимости кэшируются. Подробности: `DOCKER_FAST_START.md`.
+

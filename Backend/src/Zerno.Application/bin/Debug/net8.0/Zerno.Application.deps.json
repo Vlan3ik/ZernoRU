@@ -16,7 +16,10 @@
       },
       "Zerno.Domain/1.0.0": {
         "runtime": {
-          "Zerno.Domain.dll": {}
+          "Zerno.Domain.dll": {
+            "assemblyVersion": "1.0.0",
+            "fileVersion": "1.0.0.0"
+          }
         }
       }
     }

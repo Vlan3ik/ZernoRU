@@ -15,6 +15,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<UserAccount> Users => Set<UserAccount>();
     public DbSet<GrainLot> GrainLots => Set<GrainLot>();
     public DbSet<EquipmentLot> EquipmentLots => Set<EquipmentLot>();
+    public DbSet<AuctionLot> AuctionLots => Set<AuctionLot>();
+    public DbSet<AuctionBid> AuctionBids => Set<AuctionBid>();
     public DbSet<CartItem> CartItems => Set<CartItem>();
     public DbSet<Order> Orders => Set<Order>();
     public DbSet<OrderItem> OrderItems => Set<OrderItem>();
@@ -51,6 +53,24 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(x => x.GrainType).HasConversion<string>();
             entity.Property(x => x.PricePerTon).HasPrecision(18, 2);
             entity.Property(x => x.VolumeTons).HasPrecision(18, 2);
+        });
+
+        modelBuilder.Entity<AuctionLot>(entity =>
+        {
+            entity.HasIndex(x => x.LotId).IsUnique();
+            entity.Property(x => x.StartingPrice).HasPrecision(18, 2);
+            entity.Property(x => x.MinimumStep).HasPrecision(18, 2);
+            entity.Property(x => x.CurrentHighestBid).HasPrecision(18, 2);
+            entity.Property(x => x.Status).HasConversion<string>();
+            entity.HasMany(x => x.Bids)
+                .WithOne(x => x.AuctionLot!)
+                .HasForeignKey(x => x.AuctionLotId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<AuctionBid>(entity =>
+        {
+            entity.Property(x => x.Amount).HasPrecision(18, 2);
         });
 
         modelBuilder.Entity<EquipmentLot>(entity =>
@@ -97,7 +117,9 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
 
         modelBuilder.Entity<SubscriptionState>(entity =>
         {
-            entity.Property(x => x.Plan).HasConversion<string>();
+            entity.Property(x => x.Plan).HasConversion(
+                value => value.HasValue ? value.Value.ToString() : null,
+                value => ParseSubscriptionPlanFromStorage(value));
         });
 
         modelBuilder.Entity<PriceRecord>(entity =>
@@ -137,4 +159,23 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
                 value => value.ToList()));
         });
     }
+
+    private static SubscriptionPlan? ParseSubscriptionPlanFromStorage(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        return value.Trim().ToLowerInvariant() switch
+        {
+            "basic" or "base" or "базовый" or "monthly" or "month" or "free" or "trial" => SubscriptionPlan.Basic,
+            "professional" or "pro" or "профессиональный" or "yearly" or "year" or "annual" or "quarterly" or "quarter" => SubscriptionPlan.Professional,
+            "corporate" or "enterprise" or "corp" or "корпоративный" => SubscriptionPlan.Corporate,
+            _ => Enum.TryParse<SubscriptionPlan>(value, ignoreCase: true, out var parsed)
+                ? parsed
+                : SubscriptionPlan.Basic
+        };
+    }
+
 }

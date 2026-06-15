@@ -43,7 +43,7 @@ public sealed class MinioMediaStorageService(IConfiguration configuration, ILogg
     {
         await EnsureBucketAsync(cancellationToken).ConfigureAwait(false);
 
-        using var httpClient = new HttpClient();
+        using var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(8) };
         foreach (var asset in assets)
         {
             var statArgs = new StatObjectArgs().WithBucket(_bucket).WithObject(asset.ObjectKey);

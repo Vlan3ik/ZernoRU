@@ -1,4 +1,4 @@
-﻿import { DeleteOutlined, ShoppingCartOutlined } from '@ant-design/icons';
+import { DeleteOutlined, ShoppingCartOutlined } from '@ant-design/icons';
 import { Button, Divider, Drawer, Empty, Flex, InputNumber, List, Radio, Space, Typography, message } from 'antd';
 import { ReactNode, useMemo, useState } from 'react';
 import { DeliveryMode, PaymentMethod } from '../../types/domain';
@@ -12,14 +12,13 @@ export function CartDrawer({ trigger }: Props) {
   const [open, setOpen] = useState(false);
   const [payment, setPayment] = useState<PaymentMethod>('card');
   const [deliveryMode, setDeliveryMode] = useState<DeliveryMode>('pickup');
-  const [deliveryPrice, setDeliveryPrice] = useState(0);
 
   const cart = useAppStore((s) => s.cart);
   const updateQuantity = useAppStore((s) => s.updateCartQuantity);
   const removeCartItem = useAppStore((s) => s.removeCartItem);
   const checkout = useAppStore((s) => s.checkout);
 
-  const total = useMemo(() => cart.reduce((sum, item) => sum + item.subtotal, 0) + deliveryPrice, [cart, deliveryPrice]);
+  const total = useMemo(() => cart.reduce((sum, item) => sum + item.subtotal, 0), [cart]);
 
   const handleCheckout = async () => {
     if (!cart.length) {
@@ -27,7 +26,7 @@ export function CartDrawer({ trigger }: Props) {
       return;
     }
 
-    const order = await checkout(payment, deliveryMode, deliveryPrice);
+    const order = await checkout(payment, deliveryMode, 0);
     message.success(`Заказ ${order.id} создан на сумму ${order.total.toLocaleString('ru-RU')} ₽`);
     setOpen(false);
   };
@@ -74,11 +73,7 @@ export function CartDrawer({ trigger }: Props) {
         <Typography.Text strong>Доставка</Typography.Text>
         <Radio.Group
           value={deliveryMode}
-          onChange={(e) => {
-            const mode = e.target.value as DeliveryMode;
-            setDeliveryMode(mode);
-            if (mode === 'pickup') setDeliveryPrice(0);
-          }}
+          onChange={(e) => setDeliveryMode(e.target.value as DeliveryMode)}
           options={[
             { value: 'pickup', label: 'Самовывоз' },
             { value: 'seller_delivery', label: 'Доставка продавцом' },
@@ -88,10 +83,7 @@ export function CartDrawer({ trigger }: Props) {
         />
 
         {deliveryMode !== 'pickup' && (
-          <Space style={{ marginBottom: 18 }}>
-            <Typography.Text>Стоимость доставки:</Typography.Text>
-            <InputNumber min={500} step={500} value={deliveryPrice} onChange={(value) => setDeliveryPrice(Number(value ?? 0))} />
-          </Space>
+          <Typography.Paragraph type="secondary">Стоимость доставки согласуется отдельно после создания сделки.</Typography.Paragraph>
         )}
 
         <Flex justify="space-between" align="center">

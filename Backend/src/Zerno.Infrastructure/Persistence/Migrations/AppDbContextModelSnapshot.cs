@@ -303,6 +303,102 @@ namespace Zerno.Infrastructure.Persistence.Migrations
                     b.ToTable("ForumTopics");
                 });
 
+            modelBuilder.Entity("Zerno.Domain.Marketplace.AuctionBid", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<Guid>("AuctionLotId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsWinning")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("UserName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AuctionLotId");
+
+                    b.ToTable("AuctionBids");
+                });
+
+            modelBuilder.Entity("Zerno.Domain.Marketplace.AuctionLot", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("CurrentHighestBid")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<DateTime>("EndsAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("LeadingUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("LeadingUserName")
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("LotId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("MinimumStep")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("StartingPrice")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<DateTime>("StartsAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("WinningBidId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("WinningUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("WinningUserName")
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LotId")
+                        .IsUnique();
+
+                    b.ToTable("AuctionLots");
+                });
+
             modelBuilder.Entity("Zerno.Domain.Marketplace.CartItem", b =>
                 {
                     b.Property<Guid>("Id")
@@ -718,6 +814,17 @@ namespace Zerno.Infrastructure.Persistence.Migrations
                     b.HasDiscriminator().HasValue("grain");
                 });
 
+            modelBuilder.Entity("Zerno.Domain.Marketplace.AuctionBid", b =>
+                {
+                    b.HasOne("Zerno.Domain.Marketplace.AuctionLot", "AuctionLot")
+                        .WithMany("Bids")
+                        .HasForeignKey("AuctionLotId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("AuctionLot");
+                });
+
             modelBuilder.Entity("Zerno.Domain.Marketplace.MarketplaceLot", b =>
                 {
                     b.HasOne("Zerno.Domain.Users.UserAccount", "Seller")
@@ -736,6 +843,11 @@ namespace Zerno.Infrastructure.Persistence.Migrations
                         .HasForeignKey("OrderId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("Zerno.Domain.Marketplace.AuctionLot", b =>
+                {
+                    b.Navigation("Bids");
                 });
 
             modelBuilder.Entity("Zerno.Domain.Marketplace.Order", b =>

@@ -64,6 +64,7 @@ public sealed record PortalSnapshotDto(
     Guid CurrentUserId,
     IReadOnlyList<GrainLotDto> GrainLots,
     IReadOnlyList<EquipmentLotDto> EquipmentLots,
+    IReadOnlyList<AuctionSummaryDto> AuctionSummaries,
     IReadOnlyList<CartItemDto> Cart,
     IReadOnlyList<OrderDto> Orders,
     IReadOnlyList<ForumTopicDto> ForumTopics,

@@ -15,7 +15,7 @@ namespace Zerno.Infrastructure.Services;
 public sealed class PortalSeeder(AppDbContext dbContext, IMediaStorageService mediaStorage)
 {
     private const string SeedName = "portal-core";
-    private const int SeedVersion = 3;
+    private const int SeedVersion = 5;
 
     private static readonly MediaAssetSeed[] MediaAssets =
     [
@@ -184,6 +184,48 @@ public sealed class PortalSeeder(AppDbContext dbContext, IMediaStorageService me
             CreatedAtUtc = now
         };
 
+        var grain2Auction = new AuctionLot
+        {
+            Id = Guid.Parse("aaaa1111-aaaa-1111-aaaa-111111111111"),
+            LotId = grain2.Id,
+            StartingPrice = grain2.PricePerTon,
+            MinimumStep = 100,
+            CurrentHighestBid = 13779,
+            LeadingUserId = buyer.Id,
+            LeadingUserName = buyer.DisplayName,
+            WinningBidId = null,
+            WinningUserId = null,
+            WinningUserName = null,
+            StartsAtUtc = now.AddHours(-1),
+            EndsAtUtc = now.AddMinutes(18),
+            Status = AuctionStatus.Active,
+            CreatedAtUtc = now
+        };
+
+        grain2Auction.Bids =
+        [
+            new AuctionBid
+            {
+                Id = Guid.Parse("aaaa1111-aaaa-1111-aaaa-111111111112"),
+                AuctionLotId = grain2Auction.Id,
+                UserId = seller2.Id,
+                UserName = seller2.DisplayName,
+                Amount = 13400,
+                IsWinning = false,
+                CreatedAtUtc = now.AddMinutes(-14)
+            },
+            new AuctionBid
+            {
+                Id = Guid.Parse("aaaa1111-aaaa-1111-aaaa-111111111113"),
+                AuctionLotId = grain2Auction.Id,
+                UserId = buyer.Id,
+                UserName = buyer.DisplayName,
+                Amount = 13779,
+                IsWinning = true,
+                CreatedAtUtc = now.AddMinutes(-4)
+            }
+        ];
+
         var equipment1 = new EquipmentLot
         {
             Id = Guid.Parse("66666666-6666-6666-6666-666666666661"),
@@ -203,6 +245,7 @@ public sealed class PortalSeeder(AppDbContext dbContext, IMediaStorageService me
 
         dbContext.GrainLots.AddRange(grain1, grain2);
         dbContext.EquipmentLots.Add(equipment1);
+        dbContext.AuctionLots.Add(grain2Auction);
 
         dbContext.CartItems.Add(new CartItem
         {
@@ -277,7 +320,7 @@ public sealed class PortalSeeder(AppDbContext dbContext, IMediaStorageService me
         });
 
         dbContext.Subscriptions.AddRange(
-            new SubscriptionState { Id = Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb1"), UserId = buyer.Id, IsActive = true, Plan = SubscriptionPlan.Monthly, ExpiresAtUtc = DateTime.UtcNow.AddMonths(1), CreatedAtUtc = now },
+            new SubscriptionState { Id = Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb1"), UserId = buyer.Id, IsActive = true, Plan = SubscriptionPlan.Basic, ExpiresAtUtc = DateTime.UtcNow.AddMonths(1), CreatedAtUtc = now },
             new SubscriptionState { Id = Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb2"), UserId = seller1.Id, IsActive = false, CreatedAtUtc = now },
             new SubscriptionState { Id = Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb3"), UserId = seller2.Id, IsActive = false, CreatedAtUtc = now }
         );
@@ -296,14 +339,50 @@ public sealed class PortalSeeder(AppDbContext dbContext, IMediaStorageService me
 
         dbContext.NewsArticles.AddRange(
             new NewsArticle { Id = Guid.NewGuid(), Section = "Главные новости", Title = "Смоленские зерновые хозяйства выходят на новые объёмы", Lead = "Обзор рынка зерна региона за неделю.", DateText = "03.06.2026", Country = "Россия", Culture = "Пшеница", Region = "Смоленская область", Type = "main", CreatedAtUtc = now },
-            new NewsArticle { Id = Guid.NewGuid(), Section = "Аналитика", Title = "Пшеница 3 класса: сезонные ожидания", Lead = "Прогноз изменения цен с учетом спроса и предложения.", DateText = "02.06.2026", Country = "Россия", Culture = "Пшеница", Region = "ЦФО", Type = "analytics", CreatedAtUtc = now }
+            new NewsArticle { Id = Guid.NewGuid(), Section = "Аналитика", Title = "Пшеница 3 класса: сезонные ожидания", Lead = "Прогноз изменения цен с учетом спроса и предложения.", DateText = "02.06.2026", Country = "Россия", Culture = "Пшеница", Region = "Центральный ФО", Type = "analytics", CreatedAtUtc = now },
+            new NewsArticle { Id = Guid.NewGuid(), Section = "Аналитика", Title = "Кукуруза: давление предложения на юге", Lead = "Разбор влияния ближайших отгрузок на цену кукурузы.", DateText = "04.06.2026", Country = "Россия", Culture = "Кукуруза", Region = "Южный ФО", Type = "analytics", CreatedAtUtc = now.AddHours(-2) },
+            new NewsArticle { Id = Guid.NewGuid(), Section = "Аналитика", Title = "Ячмень: спрос комбикормовых предприятий", Lead = "Региональный обзор активности покупателей и складских остатков.", DateText = "05.06.2026", Country = "Россия", Culture = "Ячмень", Region = "Сибирский ФО", Type = "analytics", CreatedAtUtc = now.AddHours(-3) },
+            new NewsArticle { Id = Guid.NewGuid(), Section = "Пресс-релизы", Title = "Аналитический модуль обновил региональные индексы", Lead = "Портал обновил расчет динамики по основным культурам и регионам.", DateText = "06.06.2026", Country = "Россия", Culture = "Пшеница", Region = "Россия", Type = "press", CreatedAtUtc = now.AddHours(-4) }
         );
 
-        dbContext.PriceRecords.AddRange(
-            new PriceRecord { Id = Guid.NewGuid(), Culture = "Пшеница 3 класса", Region = "Смоленская область", DayPrice = 16800, WeekChange = 3.8m, CreatedAtUtc = now },
-            new PriceRecord { Id = Guid.NewGuid(), Culture = "Пшеница 4 класса", Region = "Смоленская область", DayPrice = 15620, WeekChange = 2.2m, CreatedAtUtc = now },
-            new PriceRecord { Id = Guid.NewGuid(), Culture = "Кукуруза", Region = "Смоленская область", DayPrice = 15120, WeekChange = 2.6m, CreatedAtUtc = now }
-        );
+        var priceRegions = new[]
+        {
+            "Смоленская область",
+            "Центральный ФО",
+            "Южный ФО",
+            "Приволжский ФО",
+            "Сибирский ФО",
+            "Краснодарский край",
+            "Ростовская область"
+        };
+        var priceCultures = new[]
+        {
+            (Name: "Пшеница 3 класса", Base: 16800m, Trend: 2.1m),
+            (Name: "Пшеница 4 класса", Base: 15850m, Trend: 1.2m),
+            (Name: "Пшеница 5 класса", Base: 14900m, Trend: -0.4m),
+            (Name: "Кукуруза фуражная", Base: 15120m, Trend: -1.3m),
+            (Name: "Ячмень фуражный", Base: 13950m, Trend: 1.6m)
+        };
+        var priceRecords = new List<PriceRecord>();
+        for (var cultureIndex = 0; cultureIndex < priceCultures.Length; cultureIndex++)
+        {
+            for (var regionIndex = 0; regionIndex < priceRegions.Length; regionIndex++)
+            {
+                var item = priceCultures[cultureIndex];
+                var regionalDelta = (regionIndex - 2) * 110 + cultureIndex * 45;
+                var trendDelta = ((regionIndex + cultureIndex) % 5 - 2) * 0.35m;
+                priceRecords.Add(new PriceRecord
+                {
+                    Id = Guid.NewGuid(),
+                    Culture = item.Name,
+                    Region = priceRegions[regionIndex],
+                    DayPrice = item.Base + regionalDelta,
+                    WeekChange = Math.Round(item.Trend + trendDelta, 1),
+                    CreatedAtUtc = now.AddHours(-(regionIndex + cultureIndex * 2))
+                });
+            }
+        }
+        dbContext.PriceRecords.AddRange(priceRecords);
 
         dbContext.AnalyticsPoints.AddRange(
             new AnalyticsPoint { Id = Guid.NewGuid(), Month = "Янв", Ndvi = 0.38m, Ssi = 0.64m, PriceForecast = 15100, Demand = 82, Supply = 76 },
@@ -361,6 +440,8 @@ TRUNCATE TABLE
   "CartItems",
   "OrderItems",
   "Orders",
+  "AuctionBids",
+  "AuctionLots",
   "ForumReplies",
   "ForumTopics",
   "Notifications",

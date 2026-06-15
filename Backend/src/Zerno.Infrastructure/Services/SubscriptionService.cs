@@ -26,13 +26,23 @@ public sealed class SubscriptionService(AppDbContext dbContext) : ISubscriptionS
         }
 
         subscription.IsActive = true;
-        subscription.Plan = Enum.Parse<SubscriptionPlan>(request.Plan, true);
-        subscription.ExpiresAtUtc = subscription.Plan == SubscriptionPlan.Monthly
-            ? DateTime.UtcNow.AddMonths(1)
-            : DateTime.UtcNow.AddYears(1);
+        subscription.Plan = NormalizePlan(request.Plan);
+        subscription.ExpiresAtUtc = subscription.Plan == SubscriptionPlan.Corporate
+            ? DateTime.UtcNow.AddYears(1)
+            : DateTime.UtcNow.AddMonths(1);
         subscription.UpdatedAtUtc = DateTime.UtcNow;
 
         await dbContext.SaveChangesAsync(cancellationToken);
         return new SubscriptionDto(subscription.UserId, subscription.IsActive, subscription.Plan?.ToString(), subscription.ExpiresAtUtc?.ToString("O"));
+    }
+
+    private static SubscriptionPlan NormalizePlan(string plan)
+    {
+        return plan.Trim().ToLowerInvariant() switch
+        {
+            "professional" or "pro" or "yearly" or "quarterly" => SubscriptionPlan.Professional,
+            "corporate" or "enterprise" => SubscriptionPlan.Corporate,
+            _ => SubscriptionPlan.Basic
+        };
     }
 }
