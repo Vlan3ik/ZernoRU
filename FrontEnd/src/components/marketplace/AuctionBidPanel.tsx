@@ -49,6 +49,11 @@ function normalizeSummary(summary?: AuctionSummary | AuctionSummaryDto | null): 
 
 export function AuctionBidPanel({ lotId, basePrice, sellerName, lotTitle, auction }: Props) {
   const currentUserId = useAppStore((s) => s.currentUserId);
+  const users = useAppStore((s) => s.users);
+  const currentUser = users.find((user) => user.id === currentUserId) ?? null;
+  const isVerifiedForAuction = Boolean(
+    currentUser?.isVerifiedSeller || currentUser?.sellerVerificationStatus?.toLowerCase() === 'approved',
+  );
   const navigate = useNavigate();
   const [summary, setSummary] = useState<AuctionSummary | null>(auction ?? null);
   const [bids, setBids] = useState<AuctionBidModel[]>([]);
@@ -112,6 +117,18 @@ export function AuctionBidPanel({ lotId, basePrice, sellerName, lotTitle, auctio
   const previewBids = useMemo(() => bids.slice(0, 5), [bids]);
 
   const submitBid = async () => {
+    if (!currentUser) {
+      message.warning('Сначала войдите в аккаунт.');
+      navigate('/auth');
+      return;
+    }
+
+    if (!isVerifiedForAuction) {
+      message.warning('Ставки доступны только пользователям с подтверждённой верификацией.');
+      navigate('/seller-verification');
+      return;
+    }
+
     if (ended) {
       message.info('Аукцион уже завершен.');
       return;
@@ -190,6 +207,16 @@ export function AuctionBidPanel({ lotId, basePrice, sellerName, lotTitle, auctio
           <Statistic title="Осталось" value={timeLabel} />
         </div>
 
+        {!isVerifiedForAuction && !ended && (
+          <Alert
+            type="warning"
+            showIcon
+            message="Для участия в аукционе нужна подтверждённая верификация"
+            description="Используется текущая верификация продавца: после одобрения документов ставки станут доступны автоматически."
+            action={<Button size="small" onClick={() => navigate('/seller-verification')}>Пройти верификацию</Button>}
+          />
+        )}
+
         <Space.Compact style={{ width: '100%' }}>
           <InputNumber
             min={minNextBid}
@@ -197,10 +224,10 @@ export function AuctionBidPanel({ lotId, basePrice, sellerName, lotTitle, auctio
             style={{ width: '100%' }}
             value={bidAmount}
             controls={false}
-            disabled={ended}
+            disabled={ended || !isVerifiedForAuction}
             onChange={(value) => setBidAmount(Number(value ?? minNextBid))}
           />
-          <Button type="primary" onClick={submitBid} loading={loading} disabled={ended}>
+          <Button type="primary" onClick={submitBid} loading={loading} disabled={ended || !isVerifiedForAuction}>
             Сделать ставку
           </Button>
         </Space.Compact>

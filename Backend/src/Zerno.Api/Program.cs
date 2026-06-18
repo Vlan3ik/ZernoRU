@@ -186,11 +186,25 @@ app.MapPost("/api/marketplace/checkout", async Task<IResult> (CheckoutRequestDto
     return Results.Ok(await service.CheckoutAsync(userId.Value, request, cancellationToken));
 });
 
-app.MapPost("/api/marketplace/grain", async (CreateGrainLotRequestDto request, IMarketplaceService service, CancellationToken cancellationToken) =>
-    Results.Ok(await service.CreateGrainLotAsync(request, cancellationToken)));
+app.MapPost("/api/marketplace/grain", async Task<IResult> (CreateGrainLotRequestDto request, IMarketplaceService service, CancellationToken cancellationToken) =>
+{
+    if (!HasConfirmedGrainDocuments(request))
+    {
+        return Results.BadRequest(new { message = "Для публикации зернового лота укажите подтверждённые документы: Меркурий, декларацию соответствия и договор хранения." });
+    }
 
-app.MapPost("/api/marketplace/equipment", async (CreateEquipmentLotRequestDto request, IMarketplaceService service, CancellationToken cancellationToken) =>
-    Results.Ok(await service.CreateEquipmentLotAsync(request, cancellationToken)));
+    return Results.Ok(await service.CreateGrainLotAsync(request, cancellationToken));
+});
+
+app.MapPost("/api/marketplace/equipment", async Task<IResult> (CreateEquipmentLotRequestDto request, IMarketplaceService service, CancellationToken cancellationToken) =>
+{
+    if (string.IsNullOrWhiteSpace(request.CoverImageUrl))
+    {
+        return Results.BadRequest(new { message = "Для публикации лота техники добавьте подтверждающее фото или документ." });
+    }
+
+    return Results.Ok(await service.CreateEquipmentLotAsync(request, cancellationToken));
+});
 
 app.MapPost("/api/marketplace/service-requests", async Task<IResult> (ServiceRequestDto request, HttpContext httpContext, AppDbContext dbContext, CancellationToken cancellationToken) =>
 {
@@ -244,6 +258,182 @@ app.MapPost("/api/forum/replies", async Task<IResult> (ForumReplyRequest request
     return Results.Ok(await service.CreateReplyAsync(
         new CreateForumReplyRequestDto(topicId.Value, request.AuthorName, request.Rating, request.Content),
         cancellationToken));
+});
+
+app.MapGet("/api/forum/expert-applications", async Task<IResult> (HttpContext httpContext, AppDbContext dbContext, CancellationToken cancellationToken) =>
+{
+    var userId = ResolveUserId(httpContext);
+    if (userId is null)
+    {
+        return Results.Unauthorized();
+    }
+
+    var query = dbContext.ForumExpertApplications.AsNoTracking().Where(x => x.UserId == userId.Value);
+
+    // Materialize first, then project — local functions can't be used in LINQ expression trees
+    var entities = await query
+        .OrderByDescending(x => x.CreatedAtUtc)
+        .ToListAsync(cancellationToken);
+
+    var items = entities.Select(x => ToForumExpertApplicationDto(x)).ToList();
+    return Results.Ok(items);
+});
+
+app.MapPost("/api/forum/expert-applications", async Task<IResult> (ForumExpertApplicationRequest request, HttpContext httpContext, AppDbContext dbContext, CancellationToken cancellationToken) =>
+{
+    var userId = ResolveUserId(httpContext);
+    if (userId is null)
+    {
+        return Results.Unauthorized();
+    }
+
+    var user = await dbContext.Users.FirstOrDefaultAsync(x => x.Id == userId.Value, cancellationToken);
+    if (user is null)
+    {
+        return Results.Unauthorized();
+    }
+
+    if (!user.IsVerifiedSeller && user.SellerVerificationStatus != SellerVerificationStatus.Approved)
+    {
+        return Results.BadRequest(new { message = "Заявку эксперта могут подать только пользователи с подтверждённой верификацией." });
+    }
+
+    var application = new Zerno.Domain.Forum.ForumExpertApplication
+    {
+        Id = Guid.NewGuid(),
+        UserId = user.Id,
+        UserName = user.DisplayName,
+        Section = ParseForumSection(request.Section),
+        TopicId = request.TopicId,
+        Specialization = request.Specialization.Trim(),
+        ExperienceYears = Math.Clamp(request.ExperienceYears, 1, 60),
+        ExperienceSummary = request.ExperienceSummary.Trim(),
+        Proof = request.Proof.Trim(),
+        Contact = request.Contact.Trim(),
+        Status = Zerno.Domain.Forum.ForumExpertApplicationStatus.Pending,
+        CreatedAtUtc = DateTime.UtcNow
+    };
+
+    dbContext.ForumExpertApplications.Add(application);
+    await dbContext.SaveChangesAsync(cancellationToken);
+
+    return Results.Ok(ToForumExpertApplicationDto(application));
+});
+
+app.MapPut("/api/forum/expert-applications/{applicationId:guid}", async Task<IResult> (Guid applicationId, ForumExpertApplicationRequest request, HttpContext httpContext, AppDbContext dbContext, CancellationToken cancellationToken) =>
+{
+    var userId = ResolveUserId(httpContext);
+    if (userId is null)
+    {
+        return Results.Unauthorized();
+    }
+
+    var application = await dbContext.ForumExpertApplications.FirstOrDefaultAsync(x => x.Id == applicationId && x.UserId == userId.Value, cancellationToken);
+    if (application is null)
+    {
+        return Results.NotFound();
+    }
+
+    if (application.Status == Zerno.Domain.Forum.ForumExpertApplicationStatus.Approved)
+    {
+        return Results.BadRequest(new { message = "Одобренную заявку нельзя редактировать." });
+    }
+
+    application.Section = ParseForumSection(request.Section);
+    application.TopicId = request.TopicId;
+    application.Specialization = request.Specialization.Trim();
+    application.ExperienceYears = Math.Clamp(request.ExperienceYears, 1, 60);
+    application.ExperienceSummary = request.ExperienceSummary.Trim();
+    application.Proof = request.Proof.Trim();
+    application.Contact = request.Contact.Trim();
+    application.Status = Zerno.Domain.Forum.ForumExpertApplicationStatus.Pending;
+    application.ReviewedAtUtc = null;
+    application.ReviewerName = null;
+    application.UpdatedAtUtc = DateTime.UtcNow;
+
+    await dbContext.SaveChangesAsync(cancellationToken);
+    return Results.Ok(ToForumExpertApplicationDto(application));
+});
+
+app.MapPatch("/api/forum/expert-applications/{applicationId:guid}/withdraw", async Task<IResult> (Guid applicationId, HttpContext httpContext, AppDbContext dbContext, CancellationToken cancellationToken) =>
+{
+    var userId = ResolveUserId(httpContext);
+    if (userId is null)
+    {
+        return Results.Unauthorized();
+    }
+
+    var application = await dbContext.ForumExpertApplications.FirstOrDefaultAsync(x => x.Id == applicationId && x.UserId == userId.Value, cancellationToken);
+    if (application is null)
+    {
+        return Results.NotFound();
+    }
+
+    application.Status = Zerno.Domain.Forum.ForumExpertApplicationStatus.Withdrawn;
+    application.ReviewedAtUtc = DateTime.UtcNow;
+    application.ReviewerName = "Пользователь";
+    application.UpdatedAtUtc = DateTime.UtcNow;
+    await dbContext.SaveChangesAsync(cancellationToken);
+
+    return Results.Ok(ToForumExpertApplicationDto(application));
+});
+
+app.MapPatch("/api/forum/expert-applications/{applicationId:guid}/approve", async Task<IResult> (Guid applicationId, HttpContext httpContext, AppDbContext dbContext, CancellationToken cancellationToken) =>
+{
+    var userId = ResolveUserId(httpContext);
+    if (userId is null)
+    {
+        return Results.Unauthorized();
+    }
+
+    var user = await dbContext.Users.FirstOrDefaultAsync(x => x.Id == userId.Value, cancellationToken);
+    if (user is null || user.Role != UserRole.Admin)
+    {
+        return Results.Forbid();
+    }
+
+    var application = await dbContext.ForumExpertApplications.FirstOrDefaultAsync(x => x.Id == applicationId, cancellationToken);
+    if (application is null)
+    {
+        return Results.NotFound();
+    }
+
+    application.Status = Zerno.Domain.Forum.ForumExpertApplicationStatus.Approved;
+    application.ReviewedAtUtc = DateTime.UtcNow;
+    application.ReviewerName = user.DisplayName;
+    application.UpdatedAtUtc = DateTime.UtcNow;
+
+    await dbContext.SaveChangesAsync(cancellationToken);
+    return Results.Ok(ToForumExpertApplicationDto(application));
+});
+
+app.MapPatch("/api/forum/expert-applications/{applicationId:guid}/reject", async Task<IResult> (Guid applicationId, HttpContext httpContext, AppDbContext dbContext, CancellationToken cancellationToken) =>
+{
+    var userId = ResolveUserId(httpContext);
+    if (userId is null)
+    {
+        return Results.Unauthorized();
+    }
+
+    var user = await dbContext.Users.FirstOrDefaultAsync(x => x.Id == userId.Value, cancellationToken);
+    if (user is null || user.Role != UserRole.Admin)
+    {
+        return Results.Forbid();
+    }
+
+    var application = await dbContext.ForumExpertApplications.FirstOrDefaultAsync(x => x.Id == applicationId, cancellationToken);
+    if (application is null)
+    {
+        return Results.NotFound();
+    }
+
+    application.Status = Zerno.Domain.Forum.ForumExpertApplicationStatus.Rejected;
+    application.ReviewedAtUtc = DateTime.UtcNow;
+    application.ReviewerName = user.DisplayName;
+    application.UpdatedAtUtc = DateTime.UtcNow;
+
+    await dbContext.SaveChangesAsync(cancellationToken);
+    return Results.Ok(ToForumExpertApplicationDto(application));
 });
 
 app.MapPost("/api/seller-applications", async (SellerApplicationRequest request, AppDbContext dbContext, CancellationToken cancellationToken) =>
@@ -1006,6 +1196,29 @@ app.MapPost("/api/admin/actions", (AdminActionRequest request) =>
     });
 });
 
+app.MapGet("/api/admin/forum/expert-applications", async Task<IResult> (HttpContext httpContext, AppDbContext dbContext, CancellationToken cancellationToken) =>
+{
+    var userId = ResolveUserId(httpContext);
+    if (userId is null)
+    {
+        return Results.Unauthorized();
+    }
+
+    var user = await dbContext.Users.FirstOrDefaultAsync(x => x.Id == userId.Value, cancellationToken);
+    if (user is null || user.Role != UserRole.Admin)
+    {
+        return Results.Forbid();
+    }
+
+    var entities = await dbContext.ForumExpertApplications
+        .AsNoTracking()
+        .OrderByDescending(x => x.CreatedAtUtc)
+        .ToListAsync(cancellationToken);
+
+    var items = entities.Select(x => ToForumExpertApplicationDto(x)).ToList();
+    return Results.Ok(items);
+});
+
 app.MapPatch("/api/admin/auctions/{auctionId:guid}", async Task<IResult> (Guid auctionId, AdminAuctionUpdateRequest request, AppDbContext dbContext, CancellationToken cancellationToken) =>
 {
     var auction = await dbContext.AuctionLots.FirstOrDefaultAsync(x => x.Id == auctionId, cancellationToken);
@@ -1063,14 +1276,22 @@ app.MapPatch("/api/admin/prices/{priceId:guid}", async Task<IResult> (Guid price
     return Results.Ok(new { item.Id, item.Culture, item.Region, price = item.DayPrice, change = item.WeekChange });
 });
 
-app.MapPost("/api/admin/references", async (AdminReferenceRequest request, AppDbContext dbContext, CancellationToken cancellationToken) =>
+app.MapPost("/api/admin/references", async Task<IResult> (AdminReferenceRequest request, AppDbContext dbContext, CancellationToken cancellationToken) =>
 {
     var title = string.IsNullOrWhiteSpace(request.Title) ? "Новое значение" : request.Title.Trim();
-    var slug = string.IsNullOrWhiteSpace(request.Slug) ? title.ToLowerInvariant().Replace(' ', '-') : request.Slug.Trim().ToLowerInvariant();
+    var category = string.IsNullOrWhiteSpace(request.Category) ? "general" : request.Category.Trim().ToLowerInvariant();
+    var slug = NormalizeReferenceSlug(string.IsNullOrWhiteSpace(request.Slug) ? title : request.Slug);
+    var duplicateExists = await dbContext.ReferenceCatalogItems
+        .AnyAsync(x => x.Category == category && x.Slug == slug, cancellationToken);
+    if (duplicateExists)
+    {
+        return Results.Conflict(new { message = "В этом разделе справочника уже есть запись с таким кодом. Измените код или отредактируйте существующую запись." });
+    }
+
     var item = new ReferenceCatalogItem
     {
         Id = Guid.NewGuid(),
-        Category = string.IsNullOrWhiteSpace(request.Category) ? "general" : request.Category.Trim().ToLowerInvariant(),
+        Category = category,
         Slug = slug,
         Title = title,
         Region = request.Region?.Trim() ?? "Россия",
@@ -1090,9 +1311,19 @@ app.MapPatch("/api/admin/references/{referenceId:guid}", async Task<IResult> (Gu
 {
     var item = await dbContext.ReferenceCatalogItems.FirstOrDefaultAsync(x => x.Id == referenceId, cancellationToken);
     if (item is null) return Results.NotFound();
-    item.Category = string.IsNullOrWhiteSpace(request.Category) ? item.Category : request.Category.Trim().ToLowerInvariant();
+
+    var nextCategory = string.IsNullOrWhiteSpace(request.Category) ? item.Category : request.Category.Trim().ToLowerInvariant();
+    var nextSlug = string.IsNullOrWhiteSpace(request.Slug) ? item.Slug : NormalizeReferenceSlug(request.Slug);
+    var duplicateExists = await dbContext.ReferenceCatalogItems
+        .AnyAsync(x => x.Id != referenceId && x.Category == nextCategory && x.Slug == nextSlug, cancellationToken);
+    if (duplicateExists)
+    {
+        return Results.Conflict(new { message = "В этом разделе справочника уже есть другая запись с таким кодом." });
+    }
+
+    item.Category = nextCategory;
     item.Title = string.IsNullOrWhiteSpace(request.Title) ? item.Title : request.Title.Trim();
-    item.Slug = string.IsNullOrWhiteSpace(request.Slug) ? item.Slug : request.Slug.Trim().ToLowerInvariant();
+    item.Slug = nextSlug;
     item.Region = request.Region?.Trim() ?? item.Region;
     item.Summary = request.Summary?.Trim() ?? item.Summary;
     item.Details = request.Details?.Trim() ?? item.Details;
@@ -1380,6 +1611,31 @@ app.MapGet("/api/analytics/report-example", async (AppDbContext dbContext, Cance
     });
 });
 
+app.MapGet("/api/prices/{priceId:guid}/history", async Task<IResult> (Guid priceId, AppDbContext dbContext, CancellationToken cancellationToken) =>
+{
+    var record = await dbContext.PriceRecords.AsNoTracking().FirstOrDefaultAsync(x => x.Id == priceId, cancellationToken);
+    if (record is null)
+    {
+        return Results.NotFound(new { message = "Цена не найдена." });
+    }
+
+    var seed = Math.Abs(priceId.GetHashCode());
+    var today = DateTime.UtcNow.Date;
+    var points = Enumerable.Range(0, 30)
+        .Select(index =>
+        {
+            var daysAgo = 29 - index;
+            var seasonalWave = (decimal)Math.Sin((seed % 17 + index) / 4.0) * 110m;
+            var weeklyWave = (decimal)Math.Cos((seed % 11 + index) / 2.8) * 65m;
+            var trend = record.WeekChange * (index - 29) / 7m;
+            var price = Math.Max(1000m, Math.Round(record.DayPrice + trend + seasonalWave + weeklyWave, 0));
+            return new PriceHistoryPointDto(today.AddDays(-daysAgo).ToString("yyyy-MM-dd"), price);
+        })
+        .ToList();
+
+    return Results.Ok(new PriceHistoryResponseDto(record.Id, record.Culture, record.Region, record.DayPrice, record.WeekChange, points));
+});
+
 app.MapGet("/api/analytics/tariffs", async (string? period, AppDbContext dbContext, CancellationToken cancellationToken) =>
 {
     var yearly = string.Equals(period, "year", StringComparison.OrdinalIgnoreCase);
@@ -1392,27 +1648,87 @@ app.MapGet("/api/analytics/tariffs", async (string? period, AppDbContext dbConte
         users,
         plans = new[]
         {
-            new { code = "basic", name = "Базовый", description = "Для производителей и небольших закупок", price = yearly ? "49 900 ₽/год" : "4 900 ₽/мес", features = new[] { "Ценовые карточки", "2 культуры", "3 региона", "Еженедельный обзор" }, limits = "1 пользователь, экспорт ограничен", action = "Выбрать тариф", accent = false },
-            new { code = "professional", name = "Профессиональный", description = "Для трейдеров, закупщиков и регулярной аналитики", price = yearly ? "129 000 ₽/год" : "12 900 ₽/мес", features = new[] { "Все культуры", "Все регионы", "Сигналы по посевам", "Экспорт Excel и PDF" }, limits = "До 5 пользователей", action = "Выбрать тариф", accent = true },
-            new { code = "corporate", name = "Корпоративный", description = "Для команд, экспортеров и интеграций", price = "По запросу", features = new[] { "API-доступ", "Командный кабинет", "Персональный аналитик", "Архив данных" }, limits = "Лимиты и SLA по договору", action = "Запросить условия", accent = false }
+            new
+            {
+                code = "basic",
+                name = "Базовый",
+                description = "Для фермеров и небольших хозяйств. Базовый доступ к ценам на основные культуры.",
+                price = yearly ? "49 900 ₽/год" : "4 900 ₽/мес",
+                features = new[]
+                {
+                    "Культуры: пшеница, кукуруза, ячмень",
+                    "Регионы: до 3 на выбор",
+                    "Архив цен: 30 дней",
+                    "Графики: текущая динамика",
+                    "Обзоры рынка: 1 раз в неделю",
+                    "Прогноз цены: краткий вывод",
+                    "Уведомления: личный кабинет"
+                },
+                limits = "1 пользователь · экспорт не доступен · сигналов нет",
+                action = "Выбрать тариф",
+                accent = false
+            },
+            new
+            {
+                code = "professional",
+                name = "Профессиональный",
+                description = "Для трейдеров, закупщиков и продавцов. Полный доступ к аналитике и сигналам.",
+                price = yearly ? "129 000 ₽/год" : "12 900 ₽/мес",
+                features = new[]
+                {
+                    "Все культуры (пшеница, кукуруза, ячмень, рожь, овёс)",
+                    "Все регионы и базисы поставки",
+                    "Архив цен: 12 месяцев",
+                    "Графики: сравнение периодов",
+                    "Сигналы спроса и предложения",
+                    "Обзоры рынка: ежедневно",
+                    "Прогноз цены по культуре и региону",
+                    "Уведомления: ЛК + email + Telegram",
+                    "Выгрузка: Excel и PDF"
+                },
+                limits = "До 5 пользователей · API не доступен",
+                action = "Выбрать тариф",
+                accent = true
+            },
+            new
+            {
+                code = "corporate",
+                name = "Корпоративный",
+                description = "Для команд, экспортёров и переработчиков. Расширенные данные и интеграции.",
+                price = "По запросу",
+                features = new[]
+                {
+                    "Все культуры + свои группы культур",
+                    "Все регионы + индивидуальные направления",
+                    "Полный архив цен по договору",
+                    "Сравнение регионов и экспортных базисов",
+                    "Спецобзоры под компанию",
+                    "Сигналы с настройкой порогов",
+                    "Индивидуальная модель прогноза",
+                    "Уведомления: ЛК + email + Telegram + интеграции",
+                    "Выгрузка: Excel, PDF + API-доступ",
+                    "Пользователи: по договору",
+                    "SLA и выделенный менеджер"
+                },
+                limits = "Лимиты по договору",
+                action = "Связаться с нами",
+                accent = false
+            }
         },
         comparison = new[]
         {
-            new { feature = "Доступ к ценовым карточкам", basic = "Да", pro = "Да", corp = "Да" },
-            new { feature = "Доступ к таблице цен", basic = "Ограничено", pro = "Да", corp = "Да" },
-            new { feature = "Количество культур", basic = "2", pro = "Все", corp = "Все" },
-            new { feature = "Количество регионов", basic = "3", pro = "Все", corp = "Все + персональные" },
+            new { feature = "Культуры", basic = "Пшеница, кукуруза, ячмень", pro = "Все", corp = "Все + свои группы" },
+            new { feature = "Регионы", basic = "До 3", pro = "Все регионы, базисы", corp = "Все + индивидуальные" },
+            new { feature = "Архив цен", basic = "30 дней", pro = "12 месяцев", corp = "Полный архив" },
+            new { feature = "Графики", basic = "Текущая динамика", pro = "Сравнение периодов", corp = "Сравнение регионов и базисов" },
             new { feature = "Обзоры рынка", basic = "Еженедельно", pro = "Ежедневно", corp = "Ежедневно + спецобзоры" },
-            new { feature = "Сигналы по посевам", basic = "Нет", pro = "Да", corp = "Да" },
-            new { feature = "Прогнозы", basic = "Ограничено", pro = "Да", corp = "Да" },
-            new { feature = "Уведомления", basic = "Email", pro = "ЛК, email, Telegram", corp = "Все каналы" },
-            new { feature = "Экспорт в Excel", basic = "Ограничено", pro = "Да", corp = "Да" },
-            new { feature = "Экспорт в PDF", basic = "Нет", pro = "Да", corp = "Да" },
-            new { feature = "Архив данных", basic = "30 дней", pro = "1 год", corp = "По запросу" },
-            new { feature = "Количество пользователей", basic = "1", pro = "До 5", corp = "По запросу" },
-            new { feature = "API-доступ", basic = "Нет", pro = "Нет", corp = "Да" },
-            new { feature = "Персональный аналитик", basic = "Нет", pro = "Нет", corp = "Да" },
-            new { feature = "Поддержка", basic = "Стандартная", pro = "Приоритетная", corp = "Выделенная" }
+            new { feature = "Сигналы спроса/предложения", basic = "Нет", pro = "Да", corp = "Да, с настройкой порогов" },
+            new { feature = "Прогноз цены", basic = "Краткий вывод", pro = "По культуре и региону", corp = "Индивидуальная модель" },
+            new { feature = "Уведомления", basic = "ЛК", pro = "ЛК + email + Telegram", corp = "Все каналы + интеграции" },
+            new { feature = "Выгрузка Excel", basic = "Нет", pro = "Да", corp = "Да + API" },
+            new { feature = "Выгрузка PDF", basic = "Нет", pro = "Да", corp = "Да" },
+            new { feature = "Пользователи", basic = "1", pro = "До 5", corp = "По договору" },
+            new { feature = "SLA / менеджер", basic = "Нет", pro = "Приоритетная поддержка", corp = "Выделенный менеджер + SLA" }
         }
     });
 });
@@ -1732,6 +2048,51 @@ static AdminLotDto ToAdminGrainLot(GrainLot lot)
 static AdminLotDto ToAdminEquipmentLot(EquipmentLot lot)
     => new(lot.Id, "equipment", lot.Title, lot.SellerName, lot.Region, lot.Price, lot.IsPublished, lot.CreatedAtUtc.ToString("O"));
 
+static string ForumSectionLabel(Zerno.Domain.Forum.ForumSection section)
+    => section switch
+    {
+        Zerno.Domain.Forum.ForumSection.Agrology => "Агрономия",
+        Zerno.Domain.Forum.ForumSection.Trade => "Торговля",
+        Zerno.Domain.Forum.ForumSection.Equipment => "Техника",
+        _ => "Агрономия"
+    };
+
+static string ForumExpertApplicationStatusCode(Zerno.Domain.Forum.ForumExpertApplicationStatus status)
+    => status switch
+    {
+        Zerno.Domain.Forum.ForumExpertApplicationStatus.Pending => "pending",
+        Zerno.Domain.Forum.ForumExpertApplicationStatus.Approved => "approved",
+        Zerno.Domain.Forum.ForumExpertApplicationStatus.Rejected => "rejected",
+        Zerno.Domain.Forum.ForumExpertApplicationStatus.Withdrawn => "withdrawn",
+        _ => "pending"
+    };
+
+static Zerno.Domain.Forum.ForumSection ParseForumSection(string value)
+    => value.Trim().ToLowerInvariant() switch
+    {
+        "агрономия" or "agrology" => Zerno.Domain.Forum.ForumSection.Agrology,
+        "торговля" or "trade" => Zerno.Domain.Forum.ForumSection.Trade,
+        "техника" or "equipment" => Zerno.Domain.Forum.ForumSection.Equipment,
+        _ => Zerno.Domain.Forum.ForumSection.Agrology
+    };
+
+static ForumExpertApplicationDto ToForumExpertApplicationDto(Zerno.Domain.Forum.ForumExpertApplication application)
+    => new(
+        application.Id,
+        application.UserId,
+        application.UserName,
+        ForumSectionLabel(application.Section),
+        application.TopicId,
+        application.Specialization,
+        application.ExperienceYears,
+        application.ExperienceSummary,
+        application.Proof,
+        application.Contact,
+        ForumExpertApplicationStatusCode(application.Status),
+        application.CreatedAtUtc.ToString("O"),
+        application.ReviewedAtUtc?.ToString("O"),
+        application.ReviewerName);
+
 static void UpdateLot(MarketplaceLot lot, AdminLotUpdateRequest request)
 {
     lot.Title = string.IsNullOrWhiteSpace(request.Title) ? lot.Title : request.Title.Trim();
@@ -1822,6 +2183,14 @@ static string NormalizeAnalyticsPlan(string? plan)
     };
 }
 
+static bool HasConfirmedGrainDocuments(CreateGrainLotRequestDto request)
+    => !string.IsNullOrWhiteSpace(request.MercuryCertificate)
+       && !string.IsNullOrWhiteSpace(request.DeclarationOfConformity)
+       && !string.IsNullOrWhiteSpace(request.StorageContract);
+
+static string NormalizeReferenceSlug(string value)
+    => string.Join('-', value.Trim().ToLowerInvariant().Split(' ', StringSplitOptions.RemoveEmptyEntries));
+
 public partial class Program;
 
 public sealed record UpdateCartQuantityRequest(int Quantity);
@@ -1832,6 +2201,41 @@ public sealed record ForumReplyRequest(
     string AuthorName,
     decimal Rating,
     string Content);
+
+public sealed record PriceHistoryPointDto(string Date, decimal Price);
+
+public sealed record PriceHistoryResponseDto(
+    Guid Id,
+    string Culture,
+    string Region,
+    decimal CurrentPrice,
+    decimal WeekChange,
+    IReadOnlyList<PriceHistoryPointDto> Points);
+
+public sealed record ForumExpertApplicationRequest(
+    string Section,
+    Guid? TopicId,
+    string Specialization,
+    int ExperienceYears,
+    string ExperienceSummary,
+    string Proof,
+    string Contact);
+
+file sealed record ForumExpertApplicationDto(
+    Guid Id,
+    Guid UserId,
+    string UserName,
+    string Section,
+    Guid? TopicId,
+    string Specialization,
+    int ExperienceYears,
+    string ExperienceSummary,
+    string Proof,
+    string Contact,
+    string Status,
+    string CreatedAt,
+    string? ReviewedAt,
+    string? ReviewerName);
 
 public sealed record SellerApplicationRequest(
     Guid UserId,

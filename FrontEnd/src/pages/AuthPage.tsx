@@ -1,6 +1,6 @@
 import { LockOutlined, LoginOutlined, UserAddOutlined } from '@ant-design/icons';
-import { Alert, Button, Card, Col, Form, Input, Row, Space, Tag, Tabs, Typography, message } from 'antd';
-import { useState } from 'react';
+import { Alert, Button, Card, Col, Form, Input, Row, Select, Space, Tag, Tabs, Typography, message } from 'antd';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { portalApi } from '../services/portalApi';
 import { setSession } from '../services/session';
@@ -28,6 +28,12 @@ export function AuthPage() {
       setLoading(false);
     }
   };
+
+  const referenceCatalogs = useAppStore((state) => state.referenceCatalogs);
+  const regionOptions = useMemo(() => {
+    const ref = (referenceCatalogs['regions'] ?? []).map((r) => r.title);
+    return ref.length ? ref : ['Смоленская область', 'Краснодарский край', 'Ростовская область', 'Воронежская область'];
+  }, [referenceCatalogs]);
 
   const handleRegister = async (values: {
     email: string;
@@ -145,8 +151,8 @@ export function AuthPage() {
                       </Row>
                       <Row gutter={12}>
                         <Col xs={24} md={12}>
-                          <Form.Item name="region" label="Регион" rules={[{ required: true, message: 'Введите регион' }]}>
-                            <Input placeholder="Смоленская область" />
+                          <Form.Item name="region" label="Регион" rules={[{ required: true, message: 'Выберите регион' }]}>
+                            <Select showSearch placeholder="Выберите регион" options={regionOptions.map((r) => ({ value: r, label: r }))} filterOption={(input, option) => (option?.label ?? '').toLowerCase().includes(input.toLowerCase())} />
                           </Form.Item>
                         </Col>
                         <Col xs={24} md={12}>

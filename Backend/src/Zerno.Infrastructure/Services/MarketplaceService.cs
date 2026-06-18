@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Zerno.Application.Abstractions;
 using Zerno.Application.Contracts.Marketplace;
 using Zerno.Domain.Marketplace;
+using Zerno.Domain.Users;
 using Zerno.Infrastructure.Persistence;
 
 namespace Zerno.Infrastructure.Services;
@@ -127,6 +128,11 @@ public sealed class MarketplaceService(AppDbContext dbContext) : IMarketplaceSer
 
         var user = await dbContext.Users.FirstOrDefaultAsync(x => x.Id == userId, cancellationToken)
             ?? throw new InvalidOperationException("Пользователь не найден.");
+
+        if (!user.IsVerifiedSeller && user.SellerVerificationStatus != SellerVerificationStatus.Approved)
+        {
+            throw new InvalidOperationException("Участвовать в аукционе могут только пользователи с подтверждённой верификацией.");
+        }
 
         var currentHighest = auction.Bids.Count == 0 ? auction.StartingPrice : auction.CurrentHighestBid;
         var minAllowed = currentHighest + auction.MinimumStep;

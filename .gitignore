@@ -1,0 +1,29 @@
+# Frontend
+node_modules/
+dist/
+coverage/
+.vite/
+.env*
+*.local
+
+# Backend
+bin/
+obj/
+TestResults/
+
+# IDE
+.idea/
+.vscode/
+*.user
+*.suo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+docker-compose.override.yml
+
+# Temp / cache
+.tmp/
+*.log

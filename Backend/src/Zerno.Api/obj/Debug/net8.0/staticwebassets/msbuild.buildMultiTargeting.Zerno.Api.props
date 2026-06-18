@@ -1,3 +1,0 @@
-﻿<Project>
-  <Import Project="../build/Zerno.Api.props" />
-</Project>

@@ -74,6 +74,7 @@ const adminSections = [
   { key: 'prices', path: '/admin/prices', label: 'Цены и котировки', icon: <BarChartOutlined /> },
   { key: 'analytics', path: '/admin/analytics', label: 'Аналитика', icon: <FileTextOutlined /> },
   { key: 'content', path: '/admin/content', label: 'Новости и контент', icon: <BookOutlined /> },
+  { key: 'expert-applications', path: '/admin/expert-applications', label: 'Эксперты форума', icon: <AuditOutlined /> },
   { key: 'forum', path: '/admin/forum', label: 'Форум', icon: <GlobalOutlined /> },
   { key: 'references', path: '/admin/references', label: 'Справочники', icon: <ToolOutlined /> },
   { key: 'notifications', path: '/admin/notifications', label: 'Уведомления', icon: <BellOutlined /> },
@@ -114,14 +115,16 @@ function statusTag(value: unknown) {
     pending: { label: 'На проверке', color: 'gold' },
     approved: { label: 'Одобрена', color: 'green' },
     rejected: { label: 'Отклонена', color: 'red' },
+    active: { label: 'Активен', color: 'green' },
+    hidden: { label: 'Скрыт', color: 'default' },
+    проверено: { label: 'Проверен', color: 'green' },
+    withdrawn: { label: 'Отозвана', color: 'default' },
     created: { label: 'Создан', color: 'blue' },
     paid: { label: 'Оплачен', color: 'green' },
     processing: { label: 'В работе', color: 'gold' },
-    active: { label: 'Активен', color: 'green' },
     ended: { label: 'Завершен', color: 'default' },
     cancelled: { label: 'Отменен', color: 'red' },
-    published: { label: 'Опубликовано', color: 'green' },
-    hidden: { label: 'Скрыто', color: 'default' },
+    published: { label: 'Опубликован', color: 'green' },
     draft: { label: 'Черновик', color: 'blue' },
     blocked: { label: 'Заблокирован', color: 'red' },
     verified: { label: 'Проверен', color: 'green' },
@@ -152,6 +155,139 @@ function categoryLabel(value: unknown) {
   if (raw === 'grain') return 'Зерно';
   if (raw === 'equipment') return 'Техника';
   if (raw === 'service') return 'Услуги';
+  return asString(value);
+}
+
+const adminFieldLabels: Record<string, string> = {
+  id: 'ID',
+  userId: 'ID пользователя',
+  userName: 'Пользователь',
+  displayName: 'Имя / название',
+  email: 'Email',
+  role: 'Роль',
+  companyName: 'Компания',
+  inn: 'ИНН',
+  ogrn: 'ОГРН',
+  docPhotoUrl: 'Документ',
+  status: 'Статус',
+  sellerVerificationStatus: 'Статус верификации',
+  isVerifiedSeller: 'Продавец проверен',
+  createdAt: 'Создано',
+  createdAtUtc: 'Создано',
+  updatedAt: 'Обновлено',
+  updatedAtUtc: 'Обновлено',
+  submittedAt: 'Дата подачи',
+  submittedAtUtc: 'Дата подачи',
+  reviewedAt: 'Дата проверки',
+  reviewerName: 'Проверил',
+  title: 'Название',
+  description: 'Описание',
+  category: 'Категория',
+  region: 'Регион',
+  price: 'Цена',
+  amount: 'Сумма',
+  culture: 'Культура',
+  className: 'Класс',
+  basis: 'Базис',
+  source: 'Источник',
+  slug: 'Код',
+  summary: 'Краткое описание',
+  details: 'Описание',
+  contacts: 'Контакты',
+  plan: 'Тариф',
+  period: 'Период',
+  isActive: 'Активен',
+  isPublished: 'Опубликован',
+  expiresAt: 'Действует до',
+  expireAt: 'Действует до',
+  startedAt: 'Начало',
+  startAt: 'Начало',
+  lastBid: 'Последняя ставка',
+  bidsCount: 'Ставок',
+  startingPrice: 'Стартовая цена',
+  currentHighestBid: 'Текущий максимум',
+  minimumStep: 'Шаг',
+  leads: 'Лидов',
+  views: 'Просмотры',
+  complains: 'Жалобы',
+  complaints: 'Жалобы',
+  repliesCount: 'Ответов',
+  section: 'Раздел',
+  lead: 'Лид',
+  date: 'Дата',
+  country: 'Страна',
+  subscription: 'Подписка',
+  verificationStatus: 'Статус верификации',
+  specialization: 'Специализация',
+  experienceYears: 'Стаж',
+  experienceSummary: 'Опыт',
+  proof: 'Подтверждение',
+  contact: 'Контакт',
+  authorName: 'Автор',
+  content: 'Содержание',
+  tags: 'Теги',
+  type: 'Тип',
+  rating: 'Рейтинг',
+  volumeTons: 'Объём, т',
+  pricePerTon: 'Цена за тонну',
+  qualityScore: 'Индекс качества',
+  grainType: 'Тип зерна',
+  grade: 'Класс',
+  hasOwnTransport: 'Свой транспорт',
+  auctionEnabled: 'Аукцион',
+  brand: 'Марка',
+  year: 'Год выпуска',
+  condition: 'Состояние',
+  operatingHours: 'Моточасы',
+  enginePowerHp: 'Мощность, л.с.',
+  ownershipStatus: 'Право собственности',
+  serviceType: 'Тип услуги',
+  unit: 'Единица тарифа',
+  farmType: 'Тип хозяйства',
+};
+
+function adminFieldLabel(key: string): string {
+  return adminFieldLabels[key] ?? key;
+}
+
+function renderAdminFieldValue(key: string, value: unknown): ReactNode {
+  if (value === null || value === undefined || value === '') return '—';
+
+  if (typeof value === 'boolean') {
+    return value ? <Tag color="green">Да</Tag> : <Tag>Нет</Tag>;
+  }
+
+  const raw = String(value);
+
+  // Role mapping
+  if (key === 'role' || key === 'Role') {
+    if (raw === 'Admin') return 'Администратор';
+    if (raw === 'Seller') return 'Продавец';
+    if (raw === 'Buyer') return 'Покупатель';
+    return raw;
+  }
+
+  // Category mapping
+  if (key === 'category' || key === 'Category') {
+    if (raw === 'grain') return 'Зерно';
+    if (raw === 'equipment') return 'Техника';
+    if (raw === 'service') return 'Услуги';
+    return raw;
+  }
+
+  // Plan mapping
+  if (key === 'plan' || key === 'Plan') {
+    if (raw === 'Basic') return 'Базовый';
+    if (raw === 'Professional') return 'Профессиональный';
+    if (raw === 'Corporate') return 'Корпоративный';
+    return raw;
+  }
+
+  // Status or date — use existing helpers
+  if (key.toLowerCase().includes('status')) return statusTag(value);
+  if (key.toLowerCase().includes('created') || key.toLowerCase().includes('updated') || key.toLowerCase().includes('submitted') || key.toLowerCase().includes('reviewed') || key.toLowerCase().includes('expires') || key.toLowerCase().includes('started')) return asString(formatDate(value));
+
+  if (Array.isArray(value)) return value.join(', ');
   return asString(value);
 }
 
@@ -187,6 +323,12 @@ export function AdminPage() {
   const users = useAppStore((state) => state.users);
   const currentUserId = useAppStore((state) => state.currentUserId);
   const currentUser = users.find((user) => user.id === currentUserId);
+  const expertApplications = useAppStore((state) => state.forumExpertApplications);
+  const referenceCatalogs = useAppStore((state) => state.referenceCatalogs);
+  const regionOptions = useMemo(() => {
+    const ref = (referenceCatalogs['regions'] ?? []).map((r) => r.title);
+    return ref.length ? ref : ['Россия', 'Центральный ФО', 'Южный ФО', 'Приволжский ФО'];
+  }, [referenceCatalogs]);
   const [data, setData] = useState<AdminWorkspaceDto | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -244,44 +386,48 @@ export function AdminPage() {
   };
 
   const saveModal = async () => {
-    const values = await form.validateFields();
-    if (modalMode === 'user' && selected?.id) {
-      await portalApi.updateAdminUser(String(selected.id), values);
-      message.success('Пользователь сохранён');
+    try {
+      const values = await form.validateFields();
+      if (modalMode === 'user' && selected?.id) {
+        await portalApi.updateAdminUser(String(selected.id), values);
+        message.success('Пользователь сохранён');
+      }
+      if (modalMode === 'lot' && selected?.id) {
+        await portalApi.updateAdminLot(String(selected.category), String(selected.id), values);
+        message.success('Лот сохранён');
+      }
+      if (modalMode === 'news') {
+        if (selected?.id) await portalApi.updateAdminNews(String(selected.id), values);
+        else await portalApi.createAdminNews(values);
+        message.success('Материал сохранён');
+      }
+      if (modalMode === 'price') {
+        if (selected?.id) await portalApi.updateAdminPrice(String(selected.id), values);
+        else await portalApi.createAdminPrice(values);
+        message.success('Цена сохранена');
+      }
+      if (modalMode === 'reference') {
+        if (selected?.id) await portalApi.updateAdminReference(String(selected.id), values);
+        else await portalApi.createAdminReference(values);
+        message.success('Справочник сохранён');
+      }
+      if (modalMode === 'subscription' && selected?.userId) {
+        await portalApi.updateAdminSubscription(String(selected.userId), values);
+        message.success('Подписка обновлена');
+      }
+      if (modalMode === 'notification') {
+        await portalApi.sendAdminNotification(values);
+        message.success('Уведомление создано');
+      }
+      if (modalMode === 'action') {
+        await portalApi.runAdminAction({ action: values.action, section: activeSection, comment: values.comment, objectId: selected?.id });
+        message.success('Административное действие выполнено');
+      }
+      closeModal();
+      await load();
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : 'Не удалось сохранить изменения');
     }
-    if (modalMode === 'lot' && selected?.id) {
-      await portalApi.updateAdminLot(String(selected.category), String(selected.id), values);
-      message.success('Лот сохранён');
-    }
-    if (modalMode === 'news') {
-      if (selected?.id) await portalApi.updateAdminNews(String(selected.id), values);
-      else await portalApi.createAdminNews(values);
-      message.success('Материал сохранён');
-    }
-    if (modalMode === 'price') {
-      if (selected?.id) await portalApi.updateAdminPrice(String(selected.id), values);
-      else await portalApi.createAdminPrice(values);
-      message.success('Цена сохранена');
-    }
-    if (modalMode === 'reference') {
-      if (selected?.id) await portalApi.updateAdminReference(String(selected.id), values);
-      else await portalApi.createAdminReference(values);
-      message.success('Справочник сохранён');
-    }
-    if (modalMode === 'subscription' && selected?.userId) {
-      await portalApi.updateAdminSubscription(String(selected.userId), values);
-      message.success('Подписка обновлена');
-    }
-    if (modalMode === 'notification') {
-      await portalApi.sendAdminNotification(values);
-      message.success('Уведомление создано');
-    }
-    if (modalMode === 'action') {
-      await portalApi.runAdminAction({ action: values.action, section: activeSection, comment: values.comment, objectId: selected?.id });
-      message.success('Административное действие выполнено');
-    }
-    closeModal();
-    await load();
   };
 
   if (currentUser?.role !== 'admin') {
@@ -577,6 +723,65 @@ export function AdminPage() {
     </Space>
   );
 
+  const renderExpertApplications = () => {
+    const rows: AdminRecord[] = expertApplications.map((app) => ({
+      id: app.id,
+      userId: app.userId,
+      userName: app.userName,
+      section: app.section,
+      specialization: app.specialization,
+      experienceYears: app.experienceYears,
+      experienceSummary: app.experienceSummary,
+      proof: app.proof,
+      contact: app.contact,
+      status: app.status,
+      createdAt: app.createdAt,
+      reviewedAt: app.reviewedAt ?? '',
+      reviewerName: app.reviewerName ?? '',
+    }));
+
+    const expertApplicationColumns: ColumnsType<AdminRecord> = [
+      { title: 'Пользователь', dataIndex: 'userName', fixed: 'left', width: 180 },
+      { title: 'Раздел', dataIndex: 'section', width: 130 },
+      { title: 'Специализация', dataIndex: 'specialization', width: 200 },
+      { title: 'Стаж', dataIndex: 'experienceYears', width: 80 },
+      { title: 'Статус', dataIndex: 'status', width: 130, render: statusTag },
+      { title: 'Создана', dataIndex: 'createdAt', width: 160, render: formatDate },
+      { title: 'Проверена', dataIndex: 'reviewedAt', width: 160, render: formatDate },
+      { title: 'Кто проверил', dataIndex: 'reviewerName', width: 160 },
+      { title: 'Действия', fixed: 'right', width: 240, render: (_, record) => (
+        <Space wrap>
+          <Button
+            type="primary"
+            size="small"
+            disabled={String(record.status) !== 'pending' && String(record.status) !== 'withdrawn'}
+            onClick={async () => {
+              try { await useAppStore.getState().approveForumExpertApplication(String(record.id)); message.success('Заявка одобрена'); } catch (e) { message.error(e instanceof Error ? e.message : 'Ошибка'); }
+            }}
+          >Одобрить</Button>
+          <Button
+            danger
+            size="small"
+            disabled={String(record.status) !== 'pending'}
+            onClick={async () => {
+              try { await useAppStore.getState().rejectForumExpertApplication(String(record.id)); message.success('Заявка отклонена'); } catch (e) { message.error(e instanceof Error ? e.message : 'Ошибка'); }
+            }}
+          >Отклонить</Button>
+        </Space>
+      )},
+    ];
+
+    return (
+      <Space direction="vertical" size={16} style={{ width: '100%' }}>
+        {renderHeader('Заявки экспертов форума', 'Управление заявками на статус эксперта форума: проверка, одобрение и отклонение.')}
+        <Card>
+          {tableToolbar(rows)}
+          <Table rowKey="id" columns={expertApplicationColumns} dataSource={rows} loading={loading} scroll={{ x: 1400 }} />
+        </Card>
+      </Space>
+    );
+  };
+
   const renderReferences = () => (
     <Space direction="vertical" size={16} style={{ width: '100%' }}>
       {renderHeader('Справочники', 'Управление культурами, регионами, классами, базисами, тарифами и другими выпадающими списками.', <Button type="primary" icon={<PlusOutlined />} onClick={() => openModal('reference')}>Добавить значение</Button>)}
@@ -616,6 +821,7 @@ export function AdminPage() {
     if (activeSection === 'prices') return renderPrices();
     if (activeSection === 'analytics') return renderAnalytics();
     if (activeSection === 'content') return renderContent();
+    if (activeSection === 'expert-applications') return renderExpertApplications();
     if (activeSection === 'forum') return renderForum();
     if (activeSection === 'references') return renderReferences();
     if (activeSection === 'notifications') return renderNotifications();
@@ -647,7 +853,7 @@ export function AdminPage() {
       </Content>
 
       <Drawer title="Карточка объекта" width={720} open={Boolean(selected) && !modalMode} onClose={() => setSelected(null)}>
-        {selected && <Descriptions bordered column={1} items={Object.entries(selected).map(([key, value]) => ({ key, label: key, children: Array.isArray(value) ? value.join(', ') : asString(value) }))} />}
+        {selected && <Descriptions bordered column={1} items={Object.entries(selected).map(([key, value]) => ({ key, label: adminFieldLabel(key), children: renderAdminFieldValue(key, value) }))} />}
       </Drawer>
 
       <Modal title="Административное действие" open={modalMode === 'action'} onCancel={closeModal} onOk={() => void saveModal()} destroyOnClose>
@@ -661,7 +867,7 @@ export function AdminPage() {
         <Form form={form} layout="vertical">
           <Form.Item name="displayName" label="Название / ФИО" rules={[{ required: true }]}><Input /></Form.Item>
           <Form.Item name="email" label="Email" rules={[{ required: true }, { type: 'email' }]}><Input /></Form.Item>
-          <Row gutter={12}><Col span={12}><Form.Item name="region" label="Регион"><Input /></Form.Item></Col><Col span={12}><Form.Item name="farmType" label="Тип деятельности"><Input /></Form.Item></Col></Row>
+          <Row gutter={12}><Col span={12}><Form.Item name="region" label="Регион"><Select showSearch placeholder="Выберите регион" options={regionOptions.map((r) => ({ value: r, label: r }))} filterOption={(input, option) => (option?.label ?? '').toLowerCase().includes(input.toLowerCase())} allowClear /></Form.Item></Col><Col span={12}><Form.Item name="farmType" label="Тип деятельности"><Input /></Form.Item></Col></Row>
           <Row gutter={12}><Col span={12}><Form.Item name="role" label="Права доступа"><Select options={[{ value: 'Buyer', label: 'Участник' }, { value: 'Admin', label: 'Администратор' }]} /></Form.Item></Col><Col span={12}><Form.Item name="isVerifiedSeller" label="Проверенная компания" valuePropName="checked"><Switch checkedChildren="Да" unCheckedChildren="Нет" /></Form.Item></Col></Row>
         </Form>
       </Modal>
@@ -669,7 +875,7 @@ export function AdminPage() {
       <Modal title="Лот" open={modalMode === 'lot'} onCancel={closeModal} onOk={() => void saveModal()} destroyOnClose width={720}>
         <Form form={form} layout="vertical">
           <Form.Item name="title" label="Название" rules={[{ required: true }]}><Input /></Form.Item>
-          <Row gutter={12}><Col span={12}><Form.Item name="region" label="Регион"><Input /></Form.Item></Col><Col span={12}><Form.Item name="price" label="Цена"><InputNumber min={0} style={{ width: '100%' }} /></Form.Item></Col></Row>
+          <Row gutter={12}><Col span={12}><Form.Item name="region" label="Регион"><Select showSearch placeholder="Выберите регион" options={regionOptions.map((r) => ({ value: r, label: r }))} filterOption={(input, option) => (option?.label ?? '').toLowerCase().includes(input.toLowerCase())} allowClear /></Form.Item></Col><Col span={12}><Form.Item name="price" label="Цена"><InputNumber min={0} style={{ width: '100%' }} /></Form.Item></Col></Row>
           <Form.Item name="description" label="Описание"><Input.TextArea rows={4} /></Form.Item>
           <Form.Item name="isPublished" label="Опубликован" valuePropName="checked"><Switch checkedChildren="Да" unCheckedChildren="Нет" /></Form.Item>
         </Form>
@@ -680,21 +886,32 @@ export function AdminPage() {
           <Form.Item name="title" label="Заголовок" rules={[{ required: true }]}><Input /></Form.Item>
           <Form.Item name="lead" label="Лид" rules={[{ required: true }]}><Input.TextArea rows={3} /></Form.Item>
           <Row gutter={12}><Col span={12}><Form.Item name="section" label="Раздел"><Select options={['Главные новости', 'Новости России', 'Новости СНГ', 'Аналитика', 'Пресс-релизы'].map((value) => ({ value, label: value }))} /></Form.Item></Col><Col span={12}><Form.Item name="type" label="Тип"><Select options={[{ value: 'news', label: 'Новость' }, { value: 'analytics', label: 'Аналитика' }, { value: 'press', label: 'Пресс-релиз' }]} /></Form.Item></Col></Row>
-          <Row gutter={12}><Col span={8}><Form.Item name="country" label="Страна"><Input /></Form.Item></Col><Col span={8}><Form.Item name="culture" label="Культура"><Input /></Form.Item></Col><Col span={8}><Form.Item name="region" label="Регион"><Input /></Form.Item></Col></Row>
+          <Row gutter={12}><Col span={8}><Form.Item name="country" label="Страна"><Input /></Form.Item></Col><Col span={8}><Form.Item name="culture" label="Культура"><Input /></Form.Item></Col><Col span={8}><Form.Item name="region" label="Регион"><Select showSearch placeholder="Выберите регион" options={regionOptions.map((r) => ({ value: r, label: r }))} filterOption={(input, option) => (option?.label ?? '').toLowerCase().includes(input.toLowerCase())} allowClear /></Form.Item></Col></Row>
         </Form>
       </Modal>
 
       <Modal title="Цена" open={modalMode === 'price'} onCancel={closeModal} onOk={() => void saveModal()} destroyOnClose width={760}>
         <Form form={form} layout="vertical">
           <Row gutter={12}><Col span={8}><Form.Item name="culture" label="Культура" rules={[{ required: true }]}><Select showSearch options={['Пшеница', 'Кукуруза', 'Ячмень', 'Рожь', 'Овес'].map((value) => ({ value, label: value }))} /></Form.Item></Col><Col span={8}><Form.Item name="className" label="Класс"><Select showSearch options={['3 класс', '4 класс', '5 класс', 'Фураж'].map((value) => ({ value, label: value }))} /></Form.Item></Col><Col span={8}><Form.Item name="basis" label="Базис"><Select options={['EXW', 'CPT', 'FOB', 'Элеватор', 'Порт'].map((value) => ({ value, label: value }))} /></Form.Item></Col></Row>
-          <Row gutter={12}><Col span={12}><Form.Item name="region" label="Регион" rules={[{ required: true }]}><Input /></Form.Item></Col><Col span={12}><Form.Item name="price" label="Цена, ₽/т" rules={[{ required: true }]}><InputNumber min={0} style={{ width: '100%' }} /></Form.Item></Col></Row>
+          <Row gutter={12}><Col span={12}><Form.Item name="region" label="Регион" rules={[{ required: true }]}><Select showSearch placeholder="Выберите регион" options={regionOptions.map((r) => ({ value: r, label: r }))} filterOption={(input, option) => (option?.label ?? '').toLowerCase().includes(input.toLowerCase())} /></Form.Item></Col><Col span={12}><Form.Item name="price" label="Цена, ₽/т" rules={[{ required: true }]}><InputNumber min={0} style={{ width: '100%' }} /></Form.Item></Col></Row>
           <Row gutter={12}><Col span={12}><Form.Item name="change" label="Изменение"><InputNumber style={{ width: '100%' }} /></Form.Item></Col><Col span={12}><Form.Item name="source" label="Источник"><Input /></Form.Item></Col></Row>
         </Form>
       </Modal>
 
       <Modal title="Справочник" open={modalMode === 'reference'} onCancel={closeModal} onOk={() => void saveModal()} destroyOnClose width={720}>
         <Form form={form} layout="vertical">
-          <Row gutter={12}><Col span={12}><Form.Item name="category" label="Категория" rules={[{ required: true }]}><Select options={['cultures', 'regions', 'classes', 'basis', 'lot-types', 'payments', 'delivery', 'subscription-tariffs'].map((value) => ({ value, label: value }))} /></Form.Item></Col><Col span={12}><Form.Item name="title" label="Название" rules={[{ required: true }]}><Input /></Form.Item></Col></Row>
+          <Row gutter={12}><Col span={12}><Form.Item name="category" label="Категория" rules={[{ required: true }]}><Select options={[
+  { value: 'cultures', label: 'Культуры' },
+  { value: 'regions', label: 'Регионы' },
+  { value: 'classes', label: 'Классы зерна' },
+  { value: 'basis', label: 'Базисы поставки' },
+  { value: 'lot-types', label: 'Типы лотов' },
+  { value: 'payments', label: 'Способы оплаты' },
+  { value: 'delivery', label: 'Доставка' },
+  { value: 'routes', label: 'Маршруты' },
+  { value: 'rail-tariffs', label: 'Ж/д тарифы' },
+  { value: 'subscription-tariffs', label: 'Тарифы подписки' },
+]} /></Form.Item></Col><Col span={12}><Form.Item name="title" label="Название" rules={[{ required: true }]}><Input /></Form.Item></Col></Row>
           <Row gutter={12}><Col span={12}><Form.Item name="slug" label="Код"><Input /></Form.Item></Col><Col span={12}><Form.Item name="status" label="Статус"><Select options={[{ value: 'active', label: 'Активен' }, { value: 'hidden', label: 'Скрыт' }]} /></Form.Item></Col></Row>
           <Form.Item name="summary" label="Описание"><Input.TextArea rows={3} /></Form.Item>
         </Form>

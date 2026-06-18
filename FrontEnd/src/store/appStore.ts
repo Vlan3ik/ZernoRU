@@ -90,21 +90,32 @@ interface AppState {
   addReply: (payload: Omit<ForumReply, "id" | "createdAt">) => Promise<string>;
   voteForumReply: (replyId: string, vote: "like" | "dislike") => void;
   submitForumExpertApplication: (
-    payload: Omit<
-      ForumExpertApplication,
-      "id" | "status" | "createdAt" | "reviewedAt" | "reviewerName"
-    >,
+    payload: {
+      section: string;
+      topicId?: string | null;
+      specialization: string;
+      experienceYears: number;
+      experienceSummary: string;
+      proof: string;
+      contact: string;
+    },
   ) => Promise<void>;
   updateForumExpertApplication: (
     applicationId: string,
-    payload: Omit<
-      ForumExpertApplication,
-      "id" | "status" | "createdAt" | "reviewedAt" | "reviewerName"
-    >,
+    payload: {
+      section: string;
+      topicId?: string | null;
+      specialization: string;
+      experienceYears: number;
+      experienceSummary: string;
+      proof: string;
+      contact: string;
+    },
   ) => Promise<void>;
   withdrawForumExpertApplication: (applicationId: string) => Promise<void>;
   approveForumExpertApplication: (applicationId: string) => Promise<void>;
   rejectForumExpertApplication: (applicationId: string) => Promise<void>;
+  loadAllForumExpertApplications: () => Promise<void>;
   markForumTopicViewed: (topicId: string) => void;
   activateSubscription: (plan: "basic" | "professional" | "corporate") => Promise<void>;
   calculateDelivery: (
@@ -118,6 +129,7 @@ interface AppState {
 const referenceCategories = [
   "countries",
   "cultures",
+  "regions",
   "organizations",
   "routes",
   "rail-tariffs",
@@ -134,7 +146,6 @@ function canUseStorage() {
 
 type ForumLocalState = {
   topicViews: Record<string, number>;
-  expertApplications: ForumExpertApplication[];
   pendingReplies: ForumReply[];
   replyVotesByUser: Record<string, Record<string, "like" | "dislike">>;
 };
@@ -180,7 +191,6 @@ function readForumLocalState(): ForumLocalState {
   if (!canUseStorage()) {
     return {
       topicViews: {},
-      expertApplications: [],
       pendingReplies: [],
       replyVotesByUser: {},
     };
@@ -191,7 +201,6 @@ function readForumLocalState(): ForumLocalState {
     if (!raw) {
       return {
         topicViews: {},
-        expertApplications: [],
         pendingReplies: [],
         replyVotesByUser: {},
       };
@@ -203,9 +212,6 @@ function readForumLocalState(): ForumLocalState {
         parsed.topicViews && typeof parsed.topicViews === "object"
           ? (parsed.topicViews as Record<string, number>)
           : {},
-      expertApplications: Array.isArray(parsed.expertApplications)
-        ? (parsed.expertApplications as ForumExpertApplication[])
-        : [],
       pendingReplies: Array.isArray(parsed.pendingReplies)
         ? (parsed.pendingReplies as ForumReply[])
         : [],
@@ -220,7 +226,6 @@ function readForumLocalState(): ForumLocalState {
   } catch {
     return {
       topicViews: {},
-      expertApplications: [],
       pendingReplies: [],
       replyVotesByUser: {},
     };
@@ -264,6 +269,40 @@ function saveForumLocalState(
 ) {
   const next = updater(readForumLocalState());
   return persistForumLocalState(next);
+}
+
+function mapForumExpertApplicationDto(dto: {
+  id: string;
+  userId: string;
+  userName: string;
+  section: string;
+  topicId?: string | null;
+  specialization: string;
+  experienceYears: number;
+  experienceSummary: string;
+  proof: string;
+  contact: string;
+  status: string;
+  createdAt: string;
+  reviewedAt?: string | null;
+  reviewerName?: string | null;
+}): ForumExpertApplication {
+  return {
+    id: dto.id,
+    userId: dto.userId,
+    userName: dto.userName,
+    section: dto.section as ForumExpertApplication['section'],
+    topicId: dto.topicId ?? undefined,
+    specialization: dto.specialization,
+    experienceYears: dto.experienceYears,
+    experienceSummary: dto.experienceSummary,
+    proof: dto.proof,
+    contact: dto.contact,
+    status: dto.status as ForumExpertApplication['status'],
+    createdAt: dto.createdAt,
+    reviewedAt: dto.reviewedAt ?? undefined,
+    reviewerName: dto.reviewerName ?? undefined,
+  };
 }
 
 function summarizeReplyVotes(
@@ -946,6 +985,15 @@ export const useAppStore = create<AppState>((set, get) => ({
     const forumTopics = snapshot.forumTopics.map(mapForumTopic);
     const forumReplies = snapshot.forumReplies.map(mapForumReply);
 
+    let forumExpertApplications: ForumExpertApplication[] = [];
+    try {
+      const dtoList = await portalApi.getForumExpertApplications();
+      forumExpertApplications = dtoList.map(mapForumExpertApplicationDto);
+    } catch {
+      // API not available — keep empty list
+      forumExpertApplications = [];
+    }
+
     set({
       users,
       currentUserId,
@@ -979,8 +1027,8 @@ export const useAppStore = create<AppState>((set, get) => ({
           references[index].map(mapReferenceCatalogItem),
         ]),
       ),
-      forumExpertApplications: forumLocal.expertApplications,
-      forumExperts: deriveForumExperts(forumLocal.expertApplications),
+      forumExpertApplications,
+      forumExperts: deriveForumExperts(forumExpertApplications),
       forumTopicViews: forumLocal.topicViews,
       forumReplyReactions: Object.fromEntries(
         [...forumReplies, ...forumLocal.pendingReplies].map((reply) => {
@@ -1089,7 +1137,6 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     const next = saveForumLocalState((state) => ({
       topicViews: state.topicViews,
-      expertApplications: state.expertApplications,
       pendingReplies: [reply, ...state.pendingReplies],
       replyVotesByUser: state.replyVotesByUser,
     }));
@@ -1126,7 +1173,6 @@ export const useAppStore = create<AppState>((set, get) => ({
 
       return {
         topicViews: state.topicViews,
-        expertApplications: state.expertApplications,
         pendingReplies: state.pendingReplies,
         replyVotesByUser: {
           ...state.replyVotesByUser,
@@ -1164,128 +1210,102 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   submitForumExpertApplication: async (payload) => {
-    const application: ForumExpertApplication = {
-      ...payload,
-      id: crypto.randomUUID(),
-      status: "pending",
-      createdAt: new Date().toISOString(),
-    };
-
-    const next = saveForumLocalState((state) => ({
-      topicViews: state.topicViews,
-      expertApplications: [application, ...state.expertApplications],
-      pendingReplies: state.pendingReplies,
-      replyVotesByUser: state.replyVotesByUser,
-    }));
-
-    set({
-      forumExpertApplications: next.expertApplications,
-      forumExperts: deriveForumExperts(next.expertApplications),
+    const dto = await portalApi.submitForumExpertApplication({
+      section: payload.section,
+      topicId: payload.topicId ?? null,
+      specialization: payload.specialization,
+      experienceYears: payload.experienceYears,
+      experienceSummary: payload.experienceSummary,
+      proof: payload.proof,
+      contact: payload.contact,
     });
+    const application = mapForumExpertApplicationDto(dto);
+    set((state) => ({
+      forumExpertApplications: [application, ...state.forumExpertApplications],
+      forumExperts: deriveForumExperts([application, ...state.forumExpertApplications]),
+    }));
   },
 
   updateForumExpertApplication: async (applicationId, payload) => {
-    const next = saveForumLocalState((state) => ({
-      topicViews: state.topicViews,
-      expertApplications: state.expertApplications.map((application) =>
-        application.id === applicationId
-          ? {
-              ...application,
-              ...payload,
-              status:
-                application.status === "approved"
-                  ? application.status
-                  : "pending",
-              reviewedAt:
-                application.status === "approved"
-                  ? application.reviewedAt
-                  : undefined,
-              reviewerName:
-                application.status === "approved"
-                  ? application.reviewerName
-                  : undefined,
-            }
-          : application,
-      ),
-      pendingReplies: state.pendingReplies,
-      replyVotesByUser: state.replyVotesByUser,
-    }));
-
-    set({
-      forumExpertApplications: next.expertApplications,
-      forumExperts: deriveForumExperts(next.expertApplications),
+    const dto = await portalApi.updateForumExpertApplication(applicationId, {
+      section: payload.section,
+      topicId: payload.topicId ?? null,
+      specialization: payload.specialization,
+      experienceYears: payload.experienceYears,
+      experienceSummary: payload.experienceSummary,
+      proof: payload.proof,
+      contact: payload.contact,
     });
+    const updated = mapForumExpertApplicationDto(dto);
+    set((state) => ({
+      forumExpertApplications: state.forumExpertApplications.map((app) =>
+        app.id === applicationId ? updated : app,
+      ),
+      forumExperts: deriveForumExperts(
+        state.forumExpertApplications.map((app) =>
+          app.id === applicationId ? updated : app,
+        ),
+      ),
+    }));
   },
 
   withdrawForumExpertApplication: async (applicationId) => {
-    const next = saveForumLocalState((state) => ({
-      topicViews: state.topicViews,
-      expertApplications: state.expertApplications.map((application) =>
-        application.id === applicationId
-          ? {
-              ...application,
-              status: "withdrawn",
-              reviewedAt: new Date().toISOString(),
-              reviewerName: application.reviewerName ?? "Пользователь",
-            }
-          : application,
+    const dto = await portalApi.withdrawForumExpertApplication(applicationId);
+    const updated = mapForumExpertApplicationDto(dto);
+    set((state) => ({
+      forumExpertApplications: state.forumExpertApplications.map((app) =>
+        app.id === applicationId ? updated : app,
       ),
-      pendingReplies: state.pendingReplies,
-      replyVotesByUser: state.replyVotesByUser,
+      forumExperts: deriveForumExperts(
+        state.forumExpertApplications.map((app) =>
+          app.id === applicationId ? updated : app,
+        ),
+      ),
     }));
-
-    set({
-      forumExpertApplications: next.expertApplications,
-      forumExperts: deriveForumExperts(next.expertApplications),
-    });
   },
 
   approveForumExpertApplication: async (applicationId) => {
-    const currentUser = get().users.find(
-      (user) => user.id === get().currentUserId,
-    );
-    const next = saveForumLocalState((state) => ({
-      topicViews: state.topicViews,
-      expertApplications: state.expertApplications.map((application) =>
-        application.id === applicationId
-          ? {
-              ...application,
-              status: "approved",
-              reviewedAt: new Date().toISOString(),
-              reviewerName: currentUser?.name ?? "Модератор",
-            }
-          : application,
+    const dto = await portalApi.approveForumExpertApplication(applicationId);
+    const updated = mapForumExpertApplicationDto(dto);
+    set((state) => ({
+      forumExpertApplications: state.forumExpertApplications.map((app) =>
+        app.id === applicationId ? updated : app,
       ),
-      pendingReplies: state.pendingReplies,
-      replyVotesByUser: state.replyVotesByUser,
+      forumExperts: deriveForumExperts(
+        state.forumExpertApplications.map((app) =>
+          app.id === applicationId ? updated : app,
+        ),
+      ),
     }));
-
-    set({
-      forumExpertApplications: next.expertApplications,
-      forumExperts: deriveForumExperts(next.expertApplications),
-    });
   },
 
   rejectForumExpertApplication: async (applicationId) => {
-    const next = saveForumLocalState((state) => ({
-      topicViews: state.topicViews,
-      expertApplications: state.expertApplications.map((application) =>
-        application.id === applicationId
-          ? {
-              ...application,
-              status: "rejected",
-              reviewedAt: new Date().toISOString(),
-            }
-          : application,
+    const dto = await portalApi.rejectForumExpertApplication(applicationId);
+    const updated = mapForumExpertApplicationDto(dto);
+    set((state) => ({
+      forumExpertApplications: state.forumExpertApplications.map((app) =>
+        app.id === applicationId ? updated : app,
       ),
-      pendingReplies: state.pendingReplies,
-      replyVotesByUser: state.replyVotesByUser,
+      forumExperts: deriveForumExperts(
+        state.forumExpertApplications.map((app) =>
+          app.id === applicationId ? updated : app,
+        ),
+      ),
     }));
+  },
 
-    set({
-      forumExpertApplications: next.expertApplications,
-      forumExperts: deriveForumExperts(next.expertApplications),
-    });
+  loadAllForumExpertApplications: async () => {
+    try {
+      const dtoList = await portalApi.getAdminForumExpertApplications();
+      const apps = dtoList.map(mapForumExpertApplicationDto);
+      set({
+        forumExpertApplications: apps,
+        forumExperts: deriveForumExperts(apps),
+      });
+    } catch {
+      // fallback to user-scoped list
+      await get().loadAll();
+    }
   },
 
   markForumTopicViewed: (topicId) => {
@@ -1294,7 +1314,6 @@ export const useAppStore = create<AppState>((set, get) => ({
         ...state.topicViews,
         [topicId]: (state.topicViews[topicId] ?? 0) + 1,
       },
-      expertApplications: state.expertApplications,
       pendingReplies: state.pendingReplies,
       replyVotesByUser: state.replyVotesByUser,
     }));

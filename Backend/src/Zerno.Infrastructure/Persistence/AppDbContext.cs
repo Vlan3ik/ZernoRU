@@ -22,6 +22,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<OrderItem> OrderItems => Set<OrderItem>();
     public DbSet<ForumTopic> ForumTopics => Set<ForumTopic>();
     public DbSet<ForumReply> ForumReplies => Set<ForumReply>();
+    public DbSet<ForumExpertApplication> ForumExpertApplications => Set<ForumExpertApplication>();
     public DbSet<NotificationItem> Notifications => Set<NotificationItem>();
     public DbSet<SubscriptionState> Subscriptions => Set<SubscriptionState>();
     public DbSet<NewsArticle> NewsArticles => Set<NewsArticle>();
@@ -113,6 +114,14 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         modelBuilder.Entity<ForumReply>(entity =>
         {
             entity.Property(x => x.Rating).HasPrecision(4, 2);
+        });
+
+        modelBuilder.Entity<ForumExpertApplication>(entity =>
+        {
+            entity.Property(x => x.Section).HasConversion<string>();
+            entity.Property(x => x.Status).HasConversion<string>();
+            entity.HasIndex(x => x.UserId);
+            entity.HasIndex(x => x.Status);
         });
 
         modelBuilder.Entity<SubscriptionState>(entity =>

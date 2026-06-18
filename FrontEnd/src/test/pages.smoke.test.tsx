@@ -171,8 +171,8 @@ describe('pages smoke', () => {
     const { container } = renderWithProviders(<ForumPage />);
 
     expect(container.textContent).toContain('Разделы форума');
-    expect(container.textContent).toContain('Активные темы');
-    expect(container.querySelectorAll('.nested-card').length).toBeGreaterThan(0);
+    expect(container.textContent).toContain('активных тем');
+    expect(container.querySelectorAll('.forum-topic-card').length).toBeGreaterThan(0);
   });
 
   it('filters the price archive', async () => {

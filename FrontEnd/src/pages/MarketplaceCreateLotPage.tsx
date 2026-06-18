@@ -248,28 +248,9 @@ const equipmentTypeOptions = [
 ];
 
 
-const regionOptions = [
-  "Россия",
-  "Центральный ФО",
-  "Южный ФО",
-  "Приволжский ФО",
-  "Сибирский ФО",
-  "Северо-Кавказский ФО",
-  "Уральский ФО",
-  "Северо-Западный ФО",
-  "Дальневосточный ФО",
-  "Смоленская область",
-  "Краснодарский край",
-  "Ростовская область",
-  "Воронежская область",
-  "Белгородская область",
-  "Курская область",
-  "Ставропольский край",
-  "Татарстан",
-  "Башкортостан",
-  "Омская область",
-  "Новосибирская область",
-  "Алтайский край",
+const fallbackRegions = [
+  "Россия", "Центральный ФО", "Южный ФО", "Приволжский ФО", "Сибирский ФО",
+  "Северо-Кавказский ФО", "Уральский ФО", "Северо-Западный ФО", "Дальневосточный ФО",
 ];
 
 const grainTypeOptions: GrainLot["grainType"][] = [
@@ -474,7 +455,7 @@ function ensureLotTitle(values: Partial<CreateLotFormValues>, category: CreateLo
     : composeLotTitle(values, category);
 }
 
-function ensureLotDescription(values: Partial<CreateLotFormValues>, category: CreateLotCategory) {
+function ensureLotDescription(values: Partial<CreateLotFormValues>, category: CreateLotCategory): string {
   const manualDescription = values.description?.trim();
   if (manualDescription && manualDescription.length >= 3) {
     return manualDescription;
@@ -516,6 +497,11 @@ export function MarketplaceCreateLotPage() {
   const addGrainLot = useAppStore((state) => state.addGrainLot);
   const addEquipmentLot = useAppStore((state) => state.addEquipmentLot);
   const addServiceLot = useAppStore((state) => state.addServiceLot);
+  const referenceCatalogs = useAppStore((state) => state.referenceCatalogs);
+  const activeRegions = useMemo(() => {
+    const ref = (referenceCatalogs['regions'] ?? []).map((r) => r.title);
+    return ref.length ? [...ref, ...fallbackRegions.filter((r) => !ref.includes(r))] : fallbackRegions;
+  }, [referenceCatalogs]);
   const [form] = Form.useForm<CreateLotFormValues>();
   const [step, setStep] = useState(0);
   const [activeCategory, setActiveCategory] = useState<
@@ -740,7 +726,7 @@ export function MarketplaceCreateLotPage() {
             ];
 
     const normalizedDescription = [
-      (values.description ?? ensureLotDescription(values, category)).trim(),
+      (values.description ?? ensureLotDescription(values as Partial<CreateLotFormValues>, category)).trim(),
       categoryParams.length
         ? `\nПараметры лота:\n- ${categoryParams.join("\n- ")}`
         : "",
@@ -977,7 +963,7 @@ export function MarketplaceCreateLotPage() {
                     <AutoComplete
                       allowClear
                       placeholder="Выберите или начните вводить регион"
-                      options={toSelectOptions(regionOptions)}
+                      options={toSelectOptions(activeRegions)}
                       filterOption={selectSearchFilter}
                     />
                   </Form.Item>

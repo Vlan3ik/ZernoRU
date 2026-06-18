@@ -1,12 +1,19 @@
 import { EditOutlined, LogoutOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
-import { Button, Card, Empty, Form, Input, InputNumber, Modal, Row, Col, Select, Space, Tag, Typography, message } from 'antd';
+import { Alert, Button, Card, Empty, Form, Input, InputNumber, Modal, Row, Col, Select, Space, Tag, Typography, message } from 'antd';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { forumSections } from '../data/portalContent';
 import { useAppStore } from '../store/appStore';
 import type { ForumExpertApplication, ForumSectionName } from '../types/domain';
 
-type ApplicationFormValues = Omit<ForumExpertApplication, 'id' | 'status' | 'createdAt' | 'reviewedAt' | 'reviewerName'>;
+type ApplicationFormValues = {
+  section: ForumSectionName;
+  specialization: string;
+  experienceYears: number;
+  experienceSummary: string;
+  proof: string;
+  contact: string;
+};
 
 const statusLabels: Record<ForumExpertApplication['status'], string> = {
   pending: 'На рассмотрении',
@@ -33,6 +40,9 @@ export function ForumExpertApplicationsPage() {
   const updateForumExpertApplication = useAppStore((state) => state.updateForumExpertApplication);
   const withdrawForumExpertApplication = useAppStore((state) => state.withdrawForumExpertApplication);
   const currentUser = users.find((user) => user.id === currentUserId) ?? null;
+  const isVerifiedUser = Boolean(
+    currentUser?.isVerifiedSeller || currentUser?.sellerVerificationStatus?.toLowerCase() === 'approved',
+  );
   const [editingId, setEditingId] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
 
@@ -52,8 +62,6 @@ export function ForumExpertApplicationsPage() {
       form.setFieldsValue(editingApplication);
     } else {
       form.setFieldsValue({
-        userId: currentUser?.id ?? '',
-        userName: currentUser?.name ?? '',
         section: (sectionHint as ForumSectionName) || 'Агрономия',
         specialization: '',
         experienceYears: 1,
@@ -62,7 +70,7 @@ export function ForumExpertApplicationsPage() {
         contact: currentUser?.email ?? '',
       });
     }
-  }, [currentUser?.email, currentUser?.id, currentUser?.name, editingApplication, form, modalOpen, sectionHint]);
+  }, [currentUser?.email, editingApplication, form, modalOpen, sectionHint]);
 
   const openNew = () => {
     setEditingId(null);
@@ -81,29 +89,37 @@ export function ForumExpertApplicationsPage() {
       return;
     }
 
-    const payload: ApplicationFormValues = {
-      userId: currentUser.id,
-      userName: currentUser.name,
+    if (!isVerifiedUser) {
+      message.warning('Заявку эксперта могут подать только пользователи с подтверждённой верификацией.');
+      navigate('/seller-verification');
+      return;
+    }
+
+    const payload = {
       section: values.section,
+      topicId: topicHint || null,
       specialization: values.specialization.trim(),
       experienceYears: Number(values.experienceYears),
       experienceSummary: values.experienceSummary.trim(),
       proof: values.proof.trim(),
       contact: values.contact.trim(),
-      topicId: topicHint || undefined,
     };
 
-    if (editingApplication) {
-      await updateForumExpertApplication(editingApplication.id, payload);
-      message.success('Заявка обновлена');
-    } else {
-      await submitForumExpertApplication(payload);
-      message.success('Заявка отправлена');
-    }
+    try {
+      if (editingApplication) {
+        await updateForumExpertApplication(editingApplication.id, payload);
+        message.success('Заявка обновлена');
+      } else {
+        await submitForumExpertApplication(payload);
+        message.success('Заявка отправлена');
+      }
 
-    setModalOpen(false);
-    setEditingId(null);
-    form.resetFields();
+      setModalOpen(false);
+      setEditingId(null);
+      form.resetFields();
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : 'Не удалось отправить заявку');
+    }
   };
 
   return (
@@ -119,8 +135,17 @@ export function ForumExpertApplicationsPage() {
           {topicHint && (
             <Tag color="blue">Заявка подана из темы {topicHint}</Tag>
           )}
+          {currentUser && !isVerifiedUser && (
+            <Alert
+              type="warning"
+              showIcon
+              message="Для заявки эксперта нужна подтверждённая верификация"
+              description="Используется уже существующая верификация продавца. Пройдите её один раз — после одобрения можно будет подать заявку эксперта и участвовать в аукционах."
+              action={<Button size="small" onClick={() => navigate('/seller-verification')}>Пройти верификацию</Button>}
+            />
+          )}
           <Space wrap>
-            <Button type="primary" icon={<PlusOutlined />} onClick={openNew}>
+            <Button type="primary" icon={<PlusOutlined />} onClick={openNew} disabled={Boolean(currentUser) && !isVerifiedUser}>
               Новая заявка
             </Button>
             <Button icon={<ReloadOutlined />} onClick={() => navigate(0)}>
@@ -193,7 +218,7 @@ export function ForumExpertApplicationsPage() {
       ) : (
         <Card>
           <Empty description="Заявок пока нет">
-            <Button type="primary" onClick={openNew}>
+            <Button type="primary" onClick={openNew} disabled={!isVerifiedUser}>
               Подать первую заявку
             </Button>
           </Empty>

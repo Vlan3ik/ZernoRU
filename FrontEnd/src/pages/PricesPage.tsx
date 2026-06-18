@@ -1,6 +1,6 @@
 import { AreaChartOutlined } from '@ant-design/icons';
-import { Button, Card, Col, Empty, Row, Select, Space, Table, Tag, Typography } from 'antd';
-import { useMemo, useState } from 'react';
+import { Alert, Button, Card, Col, Empty, Row, Select, Space, Spin, Table, Tag, Typography } from 'antd';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   CartesianGrid,
@@ -13,20 +13,9 @@ import {
   YAxis,
 } from 'recharts';
 import { useAppStore } from '../store/appStore';
+import { portalApi, type PriceHistoryResponseDto } from '../services/portalApi';
 import { NewsArticle, PriceRecord } from '../types/domain';
 import { priceSlugForRecord } from '../utils/price';
-
-function buildTrendSeries(record: PriceRecord) {
-  const baseline = record.day - record.weekChange * 2.1;
-  return Array.from({ length: 12 }, (_, index) => {
-    const wave = Math.sin((index / 11) * Math.PI) * record.weekChange * 0.9;
-    const drift = (index / 11) * record.weekChange * 2.1;
-    return {
-      step: `T${index + 1}`,
-      price: Math.round((baseline + drift + wave) * 10) / 10,
-    };
-  });
-}
 
 function resolvePriceRecord(prices: PriceRecord[], slug?: string): PriceRecord | undefined {
   if (!slug || slug === 'regions') return prices[0];
@@ -48,8 +37,15 @@ function relatedNews(news: NewsArticle[], record: PriceRecord) {
 export function PricesPage() {
   const navigate = useNavigate();
   const prices = useAppStore((state) => state.prices);
+  const referenceCatalogs = useAppStore((state) => state.referenceCatalogs);
   const [region, setRegion] = useState<string | undefined>();
   const [marketType, setMarketType] = useState<string | undefined>();
+
+  const regionOptions = useMemo(() => {
+    const refRegions = (referenceCatalogs['regions'] ?? []).map((r) => r.title);
+    const priceRegions = prices.map((r) => r.region);
+    return [...new Set([...refRegions, ...priceRegions])].sort();
+  }, [referenceCatalogs, prices]);
 
   const filtered = useMemo(() => {
     return prices.filter((row) => {
@@ -78,7 +74,7 @@ export function PricesPage() {
               value={region}
               onChange={setRegion}
               style={{ width: '100%' }}
-              options={[...new Set(prices.map((row) => row.region))].map((value) => ({ value, label: value }))}
+              options={regionOptions.map((value) => ({ value, label: value }))}
             />
           </Col>
           <Col xs={24} md={8} xl={5}>
@@ -172,14 +168,23 @@ export function PriceDetailPage() {
   const navigate = useNavigate();
   const prices = useAppStore((state) => state.prices);
   const news = useAppStore((state) => state.news);
-  const references = useAppStore((state) => state.referenceCatalogs);
+  const [historyData, setHistoryData] = useState<PriceHistoryResponseDto | null>(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
 
   const row = useMemo(() => resolvePriceRecord(prices, slug), [prices, slug]);
-  const chartData = useMemo(() => (row ? buildTrendSeries(row) : []), [row]);
   const otherRows = useMemo(() => prices.filter((item) => item.id !== row?.id).slice(0, 6), [prices, row]);
   const related = useMemo(() => (row ? relatedNews(news, row) : []), [news, row]);
 
-  const railItems = references['rail-tariffs']?.slice(0, 4) ?? [];
+  useEffect(() => {
+    if (!row) return;
+    setHistoryLoading(true);
+    setHistoryError(null);
+    portalApi.getPriceHistory(row.id)
+      .then(setHistoryData)
+      .catch((err: unknown) => setHistoryError(err instanceof Error ? err.message : 'Ошибка загрузки истории'))
+      .finally(() => setHistoryLoading(false));
+  }, [row?.id]);
 
   if (!row && slug !== 'regions') {
     return <Empty description="Цена не найдена" />;
@@ -192,10 +197,9 @@ export function PriceDetailPage() {
           <Typography.Link onClick={() => navigate('/prices')}>Цены</Typography.Link>
           <Typography.Title level={1}>Пшеница по регионам</Typography.Title>
           <Typography.Paragraph className="lead-text">
-            Сводная страница по регионам строится из backend snapshot и показывает распределение цен по всей выборке.
+            Распределение цен на пшеницу по всем регионам.
           </Typography.Paragraph>
         </Card>
-
         <Card title="Регионы и цены">
           <Table
             rowKey="id"
@@ -217,40 +221,67 @@ export function PriceDetailPage() {
     );
   }
 
-  const summary = summarizeRecord(row!);
+  const chartData = historyData?.points ?? [];
   const trendText = row!.weekChange >= 0 ? 'Положительная динамика' : 'Снижение';
 
   return (
     <Space direction="vertical" size={24} style={{ width: '100%' }}>
       <Card>
         <Typography.Link onClick={() => navigate('/prices')}>Цены</Typography.Link>
-        <Typography.Title level={1}>{row!.culture}</Typography.Title>
+        <Typography.Title level={1}>{row!.culture} · {row!.region}</Typography.Title>
         <Space wrap>
           <Tag color="green">Текущая цена {row!.day.toLocaleString('ru-RU')} ₽/т</Tag>
-          <Tag color="blue">Неделя {summary.week.toLocaleString('ru-RU')} ₽/т</Tag>
-          <Tag color="default">Месяц {summary.month.toLocaleString('ru-RU')} ₽/т</Tag>
+          <Tag color={row!.weekChange >= 0 ? 'green' : 'red'}>
+            За неделю {row!.weekChange >= 0 ? '+' : ''}{row!.weekChange.toLocaleString('ru-RU')} ₽
+          </Tag>
         </Space>
       </Card>
 
+      {historyError && <Alert type="warning" message="Не удалось загрузить историю цен" description={historyError} showIcon />}
+
       <Row gutter={[24, 24]}>
         <Col xs={24} xl={15}>
-          <Card title="Динамика цены" extra={<AreaChartOutlined />}>
-            <div style={{ width: '100%', height: 320 }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="step" />
-                  <YAxis width={80} />
-                  <Tooltip formatter={(value: unknown) => `${Number(value ?? 0).toLocaleString('ru-RU')} ₽/т`} />
-                  <Legend />
-                  <Line type="monotone" dataKey="price" stroke="#2f6f3e" strokeWidth={3} dot={false} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-            <Typography.Paragraph style={{ marginTop: 12 }}>
-              {trendText}: зафиксировано изменение {row!.weekChange >= 0 ? '+' : ''}
-              {row!.weekChange.toLocaleString('ru-RU')} ₽ за неделю. Тренд визуализирован без заглушек.
-            </Typography.Paragraph>
+          <Card title="Динамика цены (30 дней)" extra={historyLoading ? <Spin size="small" /> : <AreaChartOutlined />}>
+            {chartData.length ? (
+              <>
+                <div style={{ width: '100%', height: 320 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={chartData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="date" tick={{ fontSize: 11 }} />
+                      <YAxis width={80} />
+                      <Tooltip formatter={(value: unknown) => `${Number(value ?? 0).toLocaleString('ru-RU')} ₽/т`} />
+                      <Legend />
+                      <Line type="monotone" dataKey="price" stroke="#2f6f3e" strokeWidth={3} dot={false} name="Цена" />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+                <Typography.Paragraph style={{ marginTop: 12 }}>
+                  {trendText}: {row!.weekChange >= 0 ? '+' : ''}{row!.weekChange.toLocaleString('ru-RU')} ₽ за неделю.
+                  График построен по данным из архива за 30 дней.
+                </Typography.Paragraph>
+              </>
+            ) : (
+              <Empty description={historyLoading ? 'Загрузка...' : 'Нет данных для графика'} />
+            )}
+          </Card>
+
+          <Card title="Архив цен за 30 дней" style={{ marginTop: 16 }}>
+            {chartData.length ? (
+              <Table
+                rowKey="date"
+                dataSource={[...chartData].reverse()}
+                pagination={false}
+                size="small"
+                scroll={{ y: 300 }}
+                columns={[
+                  { title: 'Дата', dataIndex: 'date', key: 'date', width: 120 },
+                  { title: 'Цена, ₽/т', dataIndex: 'price', key: 'price', render: (value: number) => value.toLocaleString('ru-RU') },
+                ]}
+              />
+            ) : (
+              <Empty description={historyLoading ? 'Загрузка...' : 'Архив пуст'} />
+            )}
           </Card>
 
           <Card title="Связанные материалы" style={{ marginTop: 16 }}>
@@ -272,18 +303,7 @@ export function PriceDetailPage() {
         </Col>
 
         <Col xs={24} xl={9}>
-          <Card title="Ж/д тарифы" style={{ marginTop: 16 }}>
-            <Space direction="vertical" size={8}>
-              {railItems.length ? railItems.map((item) => (
-                <Card key={item.id} size="small" className="nested-card">
-                  <Typography.Text strong>{item.title}</Typography.Text>
-                  <Typography.Paragraph type="secondary" style={{ marginBottom: 0 }}>{item.summary}</Typography.Paragraph>
-                </Card>
-              )) : <Typography.Text type="secondary">Данные по железнодорожным тарифам загружаются из справочника.</Typography.Text>}
-            </Space>
-          </Card>
-
-          <Card title="Другие цены" style={{ marginTop: 16 }}>
+          <Card title="Другие цены">
             <Space direction="vertical" size={8}>
               {otherRows.map((item) => (
                 <Button key={item.id} type="link" onClick={() => navigate(`/prices/${priceSlugForRecord(item)}`)} style={{ padding: 0, height: 'auto' }}>

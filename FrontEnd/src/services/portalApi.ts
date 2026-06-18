@@ -1,4 +1,5 @@
 import { apiClient } from './apiClient';
+import { getSession } from './session';
 
 export interface PortalUserDto {
   id: string;
@@ -184,6 +185,20 @@ export interface PriceRecordDto {
   region: string;
   day: number;
   weekChange: number;
+}
+
+export interface PriceHistoryPointDto {
+  date: string;
+  price: number;
+}
+
+export interface PriceHistoryResponseDto {
+  id: string;
+  culture: string;
+  region: string;
+  currentPrice: number;
+  weekChange: number;
+  points: PriceHistoryPointDto[];
 }
 
 export interface AnalyticsPointDto {
@@ -474,6 +489,33 @@ export interface AdminOverviewDto {
 }
 
 
+export interface ForumExpertApplicationDto {
+  id: string;
+  userId: string;
+  userName: string;
+  section: string;
+  topicId?: string | null;
+  specialization: string;
+  experienceYears: number;
+  experienceSummary: string;
+  proof: string;
+  contact: string;
+  status: string;
+  createdAt: string;
+  reviewedAt?: string | null;
+  reviewerName?: string | null;
+}
+
+export interface ForumExpertApplicationRequest {
+  section: string;
+  topicId?: string | null;
+  specialization: string;
+  experienceYears: number;
+  experienceSummary: string;
+  proof: string;
+  contact: string;
+}
+
 export interface AdminWorkspaceDto {
   generatedAt: string;
   kpis: Array<Record<string, unknown>>;
@@ -536,6 +578,12 @@ export const portalApi = {
   createServiceRequest: (payload: Record<string, unknown>) => apiClient.post<Record<string, unknown>>('/api/marketplace/service-requests', payload),
   createTopic: (payload: Record<string, unknown>) => apiClient.post<string>('/api/forum/topics', payload),
   createReply: (payload: Record<string, unknown>) => apiClient.post<string>('/api/forum/replies', payload),
+  getForumExpertApplications: () => apiClient.get<ForumExpertApplicationDto[]>('/api/forum/expert-applications'),
+  submitForumExpertApplication: (payload: ForumExpertApplicationRequest) => apiClient.post<ForumExpertApplicationDto>('/api/forum/expert-applications', payload),
+  updateForumExpertApplication: (applicationId: string, payload: ForumExpertApplicationRequest) => apiClient.put<ForumExpertApplicationDto>(`/api/forum/expert-applications/${applicationId}`, payload),
+  withdrawForumExpertApplication: (applicationId: string) => apiClient.patch<ForumExpertApplicationDto>(`/api/forum/expert-applications/${applicationId}/withdraw`, {}),
+  approveForumExpertApplication: (applicationId: string) => apiClient.patch<ForumExpertApplicationDto>(`/api/forum/expert-applications/${applicationId}/approve`, {}),
+  rejectForumExpertApplication: (applicationId: string) => apiClient.patch<ForumExpertApplicationDto>(`/api/forum/expert-applications/${applicationId}/reject`, {}),
   submitSellerApplication: (payload: Record<string, unknown>) => apiClient.post('/api/seller-applications', payload),
   approveSellerApplication: (applicationId: string) => apiClient.patch<void>(`/api/seller-applications/${applicationId}/approve`, {}),
   rejectSellerApplication: (applicationId: string) => apiClient.patch<void>(`/api/seller-applications/${applicationId}/reject`, {}),
@@ -546,6 +594,7 @@ export const portalApi = {
   updateProfile: (payload: Record<string, unknown>) => apiClient.put<PortalUserDto>('/api/profile/me', payload),
 
   getAdminWorkspace: () => apiClient.get<AdminWorkspaceDto>('/api/admin/workspace'),
+  getAdminForumExpertApplications: () => apiClient.get<ForumExpertApplicationDto[]>('/api/admin/forum/expert-applications'),
   runAdminAction: (payload: Record<string, unknown>) => apiClient.post<Record<string, unknown>>('/api/admin/actions', payload),
   updateAdminAuction: (auctionId: string, payload: Record<string, unknown>) => apiClient.patch<Record<string, unknown>>(`/api/admin/auctions/${auctionId}`, payload),
   updateAdminSubscription: (userId: string, payload: Record<string, unknown>) => apiClient.patch<Record<string, unknown>>(`/api/admin/subscriptions/${userId}`, payload),
@@ -572,8 +621,27 @@ export const portalApi = {
   getAnalyticsMarket: (filters?: AnalyticsFiltersDto) => apiClient.get<AnalyticsMarketResponseDto>(`/api/analytics/market${buildAnalyticsQuery(filters)}`),
   getAnalyticsSignals: (filters?: AnalyticsFiltersDto) => apiClient.get<AnalyticsSignalsResponseDto>(`/api/analytics/signals${buildAnalyticsQuery(filters)}`),
   getAnalyticsReportExample: () => apiClient.get<AnalyticsReportExampleDto>('/api/analytics/report-example'),
+  getPriceHistory: (priceId: string) => apiClient.get<PriceHistoryResponseDto | null>(`/api/prices/${priceId}/history`),
   getAnalyticsTariffs: (period: 'month' | 'year') => apiClient.get<AnalyticsTariffsResponseDto>(`/api/analytics/tariffs?period=${period}`),
   saveAnalyticsSubscriptionSettings: (payload: Record<string, unknown>) => apiClient.post<{ status: string; savedAt: string }>('/api/analytics/subscription-settings', payload),
   selectAnalyticsTariff: (payload: { plan: string; period: string; paymentMode?: string; receipt?: string; payerEmail?: string; contactEmail?: string }) => apiClient.post<Record<string, unknown>>('/api/analytics/tariffs/select', payload),
+  uploadMedia: async (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const { token, userId } = getSession();
+    const headers: Record<string, string> = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    if (userId) headers['X-User-Id'] = userId;
+    const response = await fetch(`/api/media/upload`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(text || 'Upload failed');
+    }
+    return (await response.json()) as { url: string };
+  },
   mediaUrl: (objectKey: string) => `/api/media/${objectKey.replace(/^\/+/, '')}`,
 };

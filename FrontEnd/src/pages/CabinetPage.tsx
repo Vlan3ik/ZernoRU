@@ -10,7 +10,7 @@ import {
   ShopOutlined,
   UserOutlined,
 } from '@ant-design/icons';
-import { Button, Card, Col, Descriptions, Empty, Form, Input, List, Row, Space, Statistic, Switch, Table, Tag, Typography, message } from 'antd';
+import { Button, Card, Col, Descriptions, Empty, Form, Input, List, Row, Select, Space, Statistic, Switch, Table, Tag, Typography, message } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 import { useMemo, useState } from 'react';
@@ -72,6 +72,7 @@ export function CabinetPage() {
   const orders = useAppStore((state) => state.orders);
   const cart = useAppStore((state) => state.cart);
   const notifications = useAppStore((state) => state.notifications);
+  const referenceCatalogs = useAppStore((state) => state.referenceCatalogs);
   const sellerApplications = useAppStore((state) => state.sellerApplications);
   const subscription = useAppStore((state) => state.subscription);
   const [saving, setSaving] = useState(false);
@@ -256,7 +257,7 @@ export function CabinetPage() {
           <Form layout="vertical" initialValues={{ displayName: currentUser.name, region: currentUser.region, farmType: currentUser.farmType, inn: currentUser.inn, ogrn: currentUser.ogrn, emailNotificationsEnabled: true, twoFactorEnabled: false }} onFinish={(values) => void submitProfile(values)}>
             <Row gutter={16}>
               <Col xs={24} md={12}><Form.Item name="displayName" label="Название / ФИО" rules={[{ required: true, message: 'Введите название' }]}><Input /></Form.Item></Col>
-              <Col xs={24} md={12}><Form.Item name="region" label="Регион"><Input /></Form.Item></Col>
+              <Col xs={24} md={12}><Form.Item name="region" label="Регион"><Select showSearch placeholder="Выберите регион" options={(referenceCatalogs['regions'] ?? []).map((r) => ({ value: r.title, label: r.title }))} filterOption={(input, option) => (option?.label ?? '').toLowerCase().includes(input.toLowerCase())} allowClear /></Form.Item></Col>
               <Col xs={24} md={12}><Form.Item name="farmType" label="Тип деятельности"><Input /></Form.Item></Col>
               <Col xs={24} md={12}><Form.Item name="inn" label="ИНН"><Input /></Form.Item></Col>
               <Col xs={24} md={12}><Form.Item name="ogrn" label="ОГРН"><Input /></Form.Item></Col>

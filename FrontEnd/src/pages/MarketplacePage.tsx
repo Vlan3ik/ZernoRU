@@ -95,6 +95,7 @@ export function MarketplacePage() {
   const users = useAppStore((state) => state.users);
   const addToCart = useAppStore((state) => state.addToCart);
   const currentUserId = useAppStore((state) => state.currentUserId);
+  const referenceCatalogs = useAppStore((state) => state.referenceCatalogs);
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
 
@@ -124,9 +125,11 @@ export function MarketplacePage() {
   const searchOptions = useMemo(() => {
     const sellers = users.map((user) => ({ value: user.name, label: `Продавец: ${user.name}` }));
     const cultures = [...new Set(grainLots.map((lot) => lot.grainType))].map((item) => ({ value: item, label: `Культура: ${item}` }));
-    const regions = [...new Set([...grainLots.map((lot) => lot.region), ...equipmentLots.map((lot) => lot.region), ...serviceOffers.map((item) => item.region), ...serviceLots.map((item) => item.region)])].map((item) => ({ value: item, label: `Регион: ${item}` }));
+    const refRegions = (referenceCatalogs['regions'] ?? []).map((r) => r.title);
+    const lotRegions = [...grainLots.map((lot) => lot.region), ...equipmentLots.map((lot) => lot.region), ...serviceOffers.map((item) => item.region), ...serviceLots.map((item) => item.region)];
+    const regions = [...new Set([...refRegions, ...lotRegions])].map((item) => ({ value: item, label: `Регион: ${item}` }));
     return [...sellers, ...cultures, ...regions];
-  }, [users, grainLots, equipmentLots, serviceLots]);
+  }, [users, grainLots, equipmentLots, serviceLots, referenceCatalogs]);
 
   const filteredGrain = useMemo(
     () =>
@@ -346,7 +349,7 @@ export function MarketplacePage() {
 
           <Row gutter={[12, 12]}>
             <Col xs={24} md={12} xl={6}>
-              <Select allowClear value={region} onChange={setRegion} placeholder="Регион" style={{ width: '100%' }} options={[...new Set([...grainLots.map((lot) => lot.region), ...equipmentLots.map((lot) => lot.region), ...serviceOffers.map((item) => item.region)])].map((value) => ({ value, label: value }))} />
+              <Select allowClear value={region} onChange={setRegion} placeholder="Регион" style={{ width: '100%' }} options={(() => { const ref = (referenceCatalogs['regions'] ?? []).map((r) => r.title); const lots = [...grainLots.map((l) => l.region), ...equipmentLots.map((l) => l.region), ...serviceOffers.map((it) => it.region)]; return [...new Set([...ref, ...lots])].map((v) => ({ value: v, label: v })); })()} />
             </Col>
             {tab === 'grain' && (
               <>
@@ -560,7 +563,7 @@ export function MarketplacePage() {
             </Col>
             <Col xs={24} md={12}>
               <Form.Item name="region" label="Регион" rules={[{ required: true, message: 'Укажите регион' }]}>
-                <Input placeholder="Регион выполнения" />
+                <Select showSearch placeholder="Регион выполнения" options={(() => { const ref = (referenceCatalogs['regions'] ?? []).map((r) => r.title); return ref.length ? ref.map((v) => ({ value: v, label: v })) : []; })()} filterOption={(input, option) => (option?.label ?? '').toLowerCase().includes(input.toLowerCase())} />
               </Form.Item>
             </Col>
             <Col xs={24} md={12}>
