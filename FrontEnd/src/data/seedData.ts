@@ -79,6 +79,7 @@ export const seedGrainLots: GrainLot[] = [
     mercuryCertificate: 'МЕРК-2025-1129',
     declarationOfConformity: 'ЕАЭС N RU Д-RU.РА07.В.22591/25',
     storageContract: 'Договор хранения N 45/25',
+    coverImageUrl: '/images/stock/green-field.jpg',
     createdAt: now,
   },
   {
@@ -99,6 +100,7 @@ export const seedGrainLots: GrainLot[] = [
     mercuryCertificate: 'МЕРК-2025-2044',
     declarationOfConformity: 'ЕАЭС N RU Д-RU.РА07.В.99812/25',
     storageContract: 'Договор хранения N 18/25',
+    coverImageUrl: '/images/thematic/image_08.jpg',
     createdAt: now,
   },
 ];
@@ -116,6 +118,7 @@ export const seedEquipmentLots: EquipmentLot[] = [
     price: 2950000,
     region: 'Смоленск',
     description: 'Наработка 1100 м/ч, ТО по регламенту, ПСМ в наличии.',
+    coverImageUrl: '/images/stock/sunflower-tractor.jpg',
     createdAt: now,
   },
   {
@@ -130,6 +133,7 @@ export const seedEquipmentLots: EquipmentLot[] = [
     price: 12600000,
     region: 'Ярцево',
     description: 'Новый, гарантия 2 года, доступен трейд-ин.',
+    coverImageUrl: '/images/stock/tractor-field.jpg',
     createdAt: now,
   },
 ];
@@ -220,4 +224,3 @@ export const defaultSubscription: SubscriptionState = {
   plan: null,
   expiresAt: null,
 };
-
