@@ -16,6 +16,6 @@ if [ ! -d .git ]; then
   git branch --set-upstream-to="$REMOTE/$BRANCH" "$BRANCH"
 fi
 
-git pull --ff-only --prune "$REMOTE" "$BRANCH"
+git pull --ff-only --prune
 
 docker compose -p "$COMPOSE_PROJECT_NAME" -f docker-compose.prod.yml up -d --build --remove-orphans
