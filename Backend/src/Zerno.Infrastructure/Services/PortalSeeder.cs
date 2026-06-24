@@ -15,7 +15,7 @@ namespace Zerno.Infrastructure.Services;
 public sealed class PortalSeeder(AppDbContext dbContext, IMediaStorageService mediaStorage)
 {
     private const string SeedName = "portal-core";
-    private const int SeedVersion = 7;
+    private const int SeedVersion = 8;
 
     private static readonly MediaAssetSeed[] MediaAssets =
     [
@@ -156,7 +156,7 @@ public sealed class PortalSeeder(AppDbContext dbContext, IMediaStorageService me
             StorageContract = "Договор хранения N 45/25",
             Category = LotCategory.Grain,
             Price = 3024000,
-            CoverImageUrl = "/api/media/assets/grain-1.svg",
+            CoverImageUrl = "/images/thematic/image_02.jpg",
             CreatedAtUtc = now
         };
 
@@ -180,7 +180,7 @@ public sealed class PortalSeeder(AppDbContext dbContext, IMediaStorageService me
             StorageContract = "Договор хранения N 18/25",
             Category = LotCategory.Grain,
             Price = 1188000,
-            CoverImageUrl = "/api/media/assets/grain-2.svg",
+            CoverImageUrl = "/images/thematic/image_03.jpg",
             CreatedAtUtc = now
         };
 
@@ -239,7 +239,7 @@ public sealed class PortalSeeder(AppDbContext dbContext, IMediaStorageService me
             Description = "Наработка 1100 м/ч, ТО по регламенту, ПСМ в наличии.",
             Category = LotCategory.Equipment,
             Price = 2950000,
-            CoverImageUrl = "/api/media/assets/equipment-1.svg",
+            CoverImageUrl = "/images/thematic/image_06.jpg",
             CreatedAtUtc = now
         };
 
@@ -417,11 +417,11 @@ public sealed class PortalSeeder(AppDbContext dbContext, IMediaStorageService me
         var equipment1 = Guid.Parse("66666666-6666-6666-6666-666666666661");
 
         await dbContext.GrainLots.Where(x => x.Id == grain1)
-            .ExecuteUpdateAsync(setters => setters.SetProperty(x => x.CoverImageUrl, "/api/media/assets/grain-1.svg"), cancellationToken);
+            .ExecuteUpdateAsync(setters => setters.SetProperty(x => x.CoverImageUrl, "/images/thematic/image_02.jpg"), cancellationToken);
         await dbContext.GrainLots.Where(x => x.Id == grain2)
-            .ExecuteUpdateAsync(setters => setters.SetProperty(x => x.CoverImageUrl, "/api/media/assets/grain-2.svg"), cancellationToken);
+            .ExecuteUpdateAsync(setters => setters.SetProperty(x => x.CoverImageUrl, "/images/thematic/image_03.jpg"), cancellationToken);
         await dbContext.EquipmentLots.Where(x => x.Id == equipment1)
-            .ExecuteUpdateAsync(setters => setters.SetProperty(x => x.CoverImageUrl, "/api/media/assets/equipment-1.svg"), cancellationToken);
+            .ExecuteUpdateAsync(setters => setters.SetProperty(x => x.CoverImageUrl, "/images/thematic/image_06.jpg"), cancellationToken);
     }
 
     private async Task SyncUserReferencesAsync(CancellationToken cancellationToken)
@@ -524,7 +524,7 @@ RESTART IDENTITY CASCADE;
                 StorageContract = $"Договор хранения N {60 + index}/26",
                 Category = LotCategory.Grain,
                 Price = (15900 + index * 140) * (60 + index * 12),
-                CoverImageUrl = index % 3 == 0 ? "/api/media/assets/news-1.svg" : "/api/media/assets/grain-1.svg",
+                CoverImageUrl = index % 3 == 0 ? "/images/thematic/image_04.jpg" : "/images/thematic/image_12.jpg",
                 CreatedAtUtc = now.AddHours(-index * 3)
             })
             .ToList();
@@ -543,7 +543,7 @@ RESTART IDENTITY CASCADE;
                 Description = "Демо техника с реалистичным описанием, фото и условиями поставки.",
                 Category = LotCategory.Equipment,
                 Price = 1750000 + index * 420000,
-                CoverImageUrl = index % 2 == 0 ? "/api/media/assets/equipment-2.svg" : "/api/media/assets/equipment-1.svg",
+                CoverImageUrl = index % 2 == 0 ? "/images/thematic/image_08.jpg" : "/images/thematic/image_09.jpg",
                 CreatedAtUtc = now.AddHours(-index * 5)
             })
             .ToList();
