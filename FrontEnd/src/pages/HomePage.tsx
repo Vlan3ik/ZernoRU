@@ -10,13 +10,10 @@ import { Button, Card, Col, Empty, Row, Space, Table, Tag, Typography } from 'an
 import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../store/appStore';
+import { resolveNewsImage } from '../utils/newsImage';
 
 function formatRubles(value: number) {
   return value.toLocaleString('ru-RU');
-}
-
-function resolveNewsImage(imageUrl?: string) {
-  return imageUrl ?? '/images/thematic/image_01.jpg';
 }
 
 function FeatureCard({
@@ -116,9 +113,9 @@ export function HomePage() {
               extra={<Button type="link" onClick={() => navigate('/news')}>Смотреть все</Button>}
             >
               <Space direction="vertical" size={0} style={{ width: '100%' }}>
-                {latestNews.map((item) => (
+                {latestNews.map((item, index) => (
                   <div key={item.id} className="home-news-item" onClick={() => navigate(`/news/${item.id}`)} role="button" tabIndex={0}>
-                    <img src={resolveNewsImage(item.imageUrl)} alt={item.title} className="home-news-item__image" />
+                    <img src={resolveNewsImage(item, index)} alt={item.title} className="home-news-item__image" />
                     <div className="home-news-item__copy">
                       <Typography.Text strong>{item.title}</Typography.Text>
                       <Typography.Paragraph className="home-news-item__lead">{item.lead}</Typography.Paragraph>

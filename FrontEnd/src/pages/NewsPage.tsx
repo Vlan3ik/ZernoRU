@@ -5,6 +5,7 @@ import { useMemo } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useAppStore } from '../store/appStore';
 import { NewsArticle } from '../types/domain';
+import { fallbackNewsImage, resolveNewsImage } from '../utils/newsImage';
 
 type SortMode = 'new' | 'importance';
 
@@ -38,31 +39,6 @@ function parseRuDate(value: string) {
 function formatReadTime(lead: string) {
   const words = lead.trim().split(/\s+/).filter(Boolean).length;
   return `${Math.max(2, Math.round(words / 35))} мин`;
-}
-
-const newsFallbackImages = [
-  '/images/thematic/image_01.jpg',
-  '/images/thematic/image_05.jpg',
-  '/images/thematic/image_09.jpg',
-  '/images/thematic/image_13.jpg',
-  '/images/stock/green-field.jpg',
-  '/images/stock/sunflower-tractor.jpg',
-];
-
-function fallbackNewsImage(article: NewsArticle, index = 0) {
-  if (article.section === 'Пресс-релизы') return '/images/stock/green-field.jpg';
-  if (article.section === 'Аналитика') return '/images/thematic/image_13.jpg';
-  const seed = article.id.split('').reduce((sum, char) => sum + char.charCodeAt(0), index);
-  return newsFallbackImages[Math.abs(seed) % newsFallbackImages.length];
-}
-
-function resolveNewsImage(article: NewsArticle, index = 0) {
-  const imageUrl = article.imageUrl?.trim();
-  if (!imageUrl || imageUrl.startsWith('/api/media/assets/')) {
-    return fallbackNewsImage(article, index);
-  }
-
-  return imageUrl;
 }
 
 function shareNews(title: string, url: string) {

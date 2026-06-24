@@ -113,31 +113,6 @@ public sealed class PortalSnapshotService(
 
     private static string? ResolveNewsImageUrl(string section, string title)
     {
-        if (section == "Главные новости" || title.Contains("Смоленские", StringComparison.OrdinalIgnoreCase))
-        {
-            return "/api/media/assets/news-1.svg";
-        }
-
-        if (section == "Новости России" || title.Contains("вагон", StringComparison.OrdinalIgnoreCase))
-        {
-            return "/api/media/assets/news-2.svg";
-        }
-
-        if (section == "Новости СНГ" || title.Contains("Казахстан", StringComparison.OrdinalIgnoreCase) || title.Contains("Беларус", StringComparison.OrdinalIgnoreCase))
-        {
-            return "/api/media/assets/news-3.svg";
-        }
-
-        if (section == "Аналитика")
-        {
-            return "/api/media/assets/news-4.svg";
-        }
-
-        if (section == "Пресс-релизы")
-        {
-            return "/api/media/assets/news-5.svg";
-        }
-
         return null;
     }
 }
