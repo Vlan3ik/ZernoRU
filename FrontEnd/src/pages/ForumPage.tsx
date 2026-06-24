@@ -36,7 +36,7 @@ import {
   message,
 } from "antd";
 import dayjs from "dayjs";
-import { MdEditor } from "md-editor-rt";
+import { config as mdEditorConfig, MdEditor, zh_CN as mdEditorZhCN } from "md-editor-rt";
 import "md-editor-rt/lib/style.css";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -112,6 +112,97 @@ const forumSortOptions = [
   { label: "Обсуждаемые", value: "discussion" },
   { label: "Есть проверенный ответ", value: "answered" },
 ];
+
+mdEditorConfig({
+  editorConfig: {
+    languageUserDefined: {
+      "ru-RU": {
+        ...mdEditorZhCN,
+        toolbarTips: {
+          ...mdEditorZhCN.toolbarTips,
+          bold: "Жирный",
+          underline: "Подчёркнутый",
+          italic: "Курсив",
+          strikeThrough: "Зачёркнутый",
+          title: "Заголовок",
+          sub: "Нижний индекс",
+          sup: "Верхний индекс",
+          quote: "Цитата",
+          unorderedList: "Маркированный список",
+          orderedList: "Нумерованный список",
+          task: "Список задач",
+          codeRow: "Встроенный код",
+          code: "Блок кода",
+          link: "Ссылка",
+          image: "Изображение",
+          table: "Таблица",
+          mermaid: "Диаграммы Mermaid",
+          katex: "Формула",
+          revoke: "Отменить",
+          next: "Повторить",
+          save: "Сохранить",
+          prettier: "Форматировать",
+          pageFullscreen: "Полноэкранный режим страницы",
+          fullscreen: "Полноэкранный режим",
+          preview: "Предпросмотр",
+          previewOnly: "Только предпросмотр",
+          htmlPreview: "HTML-просмотр",
+          catalog: "Оглавление",
+          github: "Исходный код",
+        },
+        titleItem: {
+          h1: "Заголовок 1",
+          h2: "Заголовок 2",
+          h3: "Заголовок 3",
+          h4: "Заголовок 4",
+          h5: "Заголовок 5",
+          h6: "Заголовок 6",
+        },
+        imgTitleItem: {
+          link: "Добавить ссылку",
+          upload: "Загрузить изображение",
+          clip2upload: "Обрезать и загрузить",
+        },
+        linkModalTips: {
+          linkTitle: "Добавить ссылку",
+          imageTitle: "Добавить изображение",
+          descLabel: "Описание:",
+          descLabelPlaceHolder: "Введите описание...",
+          urlLabel: "Ссылка:",
+          urlLabelPlaceHolder: "Введите ссылку...",
+          buttonOK: "ОК",
+        },
+        clipModalTips: {
+          title: "Обрезка изображения",
+          buttonUpload: "Загрузить",
+        },
+        copyCode: {
+          text: "Копировать код",
+          successTips: "Скопировано!",
+          failTips: "Не удалось скопировать",
+        },
+        mermaid: {
+          flow: "Блок-схема",
+          sequence: "Диаграмма последовательностей",
+          gantt: "Диаграмма Ганта",
+          class: "Диаграмма классов",
+          state: "Диаграмма состояний",
+          pie: "Круговая диаграмма",
+          relationship: "Диаграмма связей",
+          journey: "Карта пути",
+        },
+        katex: {
+          inline: "Встроенная формула",
+          block: "Формула блоком",
+        },
+        footer: {
+          markdownTotal: "Символов",
+          scrollAuto: "Синхронная прокрутка",
+        },
+      },
+    },
+  },
+});
 
 function sectionIdForName(name: string) {
   return (
@@ -525,6 +616,7 @@ function ForumMarkdownEditor({
         modelValue={value}
         onChange={(nextValue) => onChange?.(nextValue)}
         placeholder={placeholder}
+        language="ru-RU"
         noUploadImg
         toolbarsExclude={[
           "github",
