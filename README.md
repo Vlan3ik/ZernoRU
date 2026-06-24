@@ -15,6 +15,7 @@
 - `FrontEnd/` - основной пользовательский интерфейс
 - `Backend/` - API, бизнес-логика, миграции, seed и storage
 - `docker-compose.yml` - единая точка запуска
+- `docker-compose.prod.yml` - production-стек для сервера
 - `docker/nginx/default.conf` - маршрутизация `/` и `/api`
 
 ### Backend
@@ -144,3 +145,18 @@ http://192.168.1.50:18081
 
 Первый запуск frontend может показать `Installing frontend npm packages...` — это установка зависимостей в Docker volume. После первого успешного запуска зависимости кэшируются. Подробности: `DOCKER_FAST_START.md`.
 
+## Production и автодеплой
+
+Для сервера используется `docker-compose.prod.yml`. В production frontend слушает `5173`, чтобы совпадать с nginx-upstream.
+
+GitHub Actions workflow `Deploy ZernoRU` запускается на `push` в `main` и на ручной `workflow_dispatch`.
+
+Нужные secrets в GitHub:
+
+- `DEPLOY_HOST` - адрес сервера
+- `DEPLOY_USER` - пользователь для SSH
+- `DEPLOY_PORT` - SSH-порт, если не `22`
+- `DEPLOY_PATH` - каталог на сервере, куда синхронизируется репозиторий
+- `DEPLOY_SSH_KEY` - private key для SSH-доступа
+
+Workflow синхронизирует код на сервер, затем выполняет `docker compose -p zernoru -f docker-compose.prod.yml up -d --build --remove-orphans`.
