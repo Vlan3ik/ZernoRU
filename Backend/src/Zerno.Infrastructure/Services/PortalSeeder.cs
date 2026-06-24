@@ -15,22 +15,22 @@ namespace Zerno.Infrastructure.Services;
 public sealed class PortalSeeder(AppDbContext dbContext, IMediaStorageService mediaStorage)
 {
     private const string SeedName = "portal-core";
-    private const int SeedVersion = 5;
+    private const int SeedVersion = 6;
 
     private static readonly MediaAssetSeed[] MediaAssets =
     [
-        new("assets/grain-1.jpg", "https://images.pexels.com/photos/17707608/pexels-photo-17707608.jpeg?auto=compress&cs=tinysrgb&w=1600", "image/jpeg"),
-        new("assets/grain-2.jpg", "https://images.pexels.com/photos/5059109/pexels-photo-5059109.jpeg?auto=compress&cs=tinysrgb&w=1600", "image/jpeg"),
-        new("assets/equipment-1.jpg", "https://images.pexels.com/photos/19192242/pexels-photo-19192242.jpeg?auto=compress&cs=tinysrgb&w=1600", "image/jpeg"),
-        new("assets/equipment-2.jpg", "https://images.unsplash.com/photo-1592982537447-7d5f7c8f7a67?auto=format&fit=crop&w=1600&q=80", "image/jpeg"),
-        new("assets/equipment-3.jpg", "https://images.unsplash.com/photo-1515923029361-7d4e0f4f95f4?auto=format&fit=crop&w=1600&q=80", "image/jpeg"),
-        new("assets/media-warehouse.jpg", "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&w=1600&q=80", "image/jpeg"),
+        new("assets/grain-1.svg", CreateSvgDataUrl("Зерно", "Лот с зерновой партией", "#8b6d3b", "#3f2f18"), "image/svg+xml"),
+        new("assets/grain-2.svg", CreateSvgDataUrl("Зерно", "Вторая зерновая карточка", "#9a7a46", "#4b371d"), "image/svg+xml"),
+        new("assets/equipment-1.svg", CreateSvgDataUrl("Техника", "Комбайн и спецтехника", "#54707c", "#24343c"), "image/svg+xml"),
+        new("assets/equipment-2.svg", CreateSvgDataUrl("Техника", "Поставки и сервис", "#5d6675", "#2a2f3c"), "image/svg+xml"),
+        new("assets/equipment-3.svg", CreateSvgDataUrl("Техника", "Складская логистика", "#6e5d4b", "#33261c"), "image/svg+xml"),
+        new("assets/media-warehouse.svg", CreateSvgDataUrl("Склад", "Инфраструктура хранения", "#546a5c", "#243029"), "image/svg+xml"),
         new("assets/doc-1.svg", CreateSvgDataUrl("Документы", "Верификация поставщика", "#575f6b", "#1e2630"), "image/svg+xml"),
-        new("assets/news-1.jpg", "https://images.pexels.com/photos/17707608/pexels-photo-17707608.jpeg?auto=compress&cs=tinysrgb&w=1600", "image/jpeg"),
-        new("assets/news-2.jpg", "https://images.pexels.com/photos/15153680/pexels-photo-15153680.jpeg?auto=compress&cs=tinysrgb&w=1600", "image/jpeg"),
-        new("assets/news-3.jpg", "https://images.pexels.com/photos/12293632/pexels-photo-12293632.jpeg?auto=compress&cs=tinysrgb&w=1600", "image/jpeg"),
-        new("assets/news-4.jpg", "https://images.pexels.com/photos/19192242/pexels-photo-19192242.jpeg?auto=compress&cs=tinysrgb&w=1600", "image/jpeg"),
-        new("assets/news-5.jpg", "https://images.pexels.com/photos/5059109/pexels-photo-5059109.jpeg?auto=compress&cs=tinysrgb&w=1600", "image/jpeg"),
+        new("assets/news-1.svg", CreateSvgDataUrl("Новости", "Главные новости рынка", "#9b4f3f", "#4b221a"), "image/svg+xml"),
+        new("assets/news-2.svg", CreateSvgDataUrl("Новости", "Южные порты и вагоны", "#6a4f2d", "#312111"), "image/svg+xml"),
+        new("assets/news-3.svg", CreateSvgDataUrl("Новости", "Рынки СНГ и экспорт", "#4f6b7d", "#20323c"), "image/svg+xml"),
+        new("assets/news-4.svg", CreateSvgDataUrl("Аналитика", "Рыночные сигналы дня", "#5a5f8e", "#23233c"), "image/svg+xml"),
+        new("assets/news-5.svg", CreateSvgDataUrl("Пресс-релиз", "Официальное сообщение", "#7b5b87", "#321d38"), "image/svg+xml"),
         new("assets/service-1.svg", CreateSvgDataUrl("Сервис", "Агросопровождение", "#54725e", "#203027"), "image/svg+xml"),
         new("assets/service-2.svg", CreateSvgDataUrl("Сервис", "Аналитика поставок", "#63704a", "#242c18"), "image/svg+xml"),
         new("assets/service-3.svg", CreateSvgDataUrl("Сервис", "Логистика", "#7a5d33", "#312415"), "image/svg+xml"),

@@ -1,0 +1,13 @@
+[Unit]
+Description=Pull and deploy ZernoRU
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=vlan
+Group=vlan
+WorkingDirectory=/home/vlan/ZernoRU/current
+Environment=DEPLOY_DIR=/home/vlan/ZernoRU/current
+Environment=COMPOSE_PROJECT_NAME=zernoru
+ExecStart=/bin/sh /home/vlan/ZernoRU/current/deploy/zernoru-pull.sh

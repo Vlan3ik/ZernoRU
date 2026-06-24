@@ -1,0 +1,12 @@
+[Unit]
+Description=Run ZernoRU git-pull deploy periodically
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=1min
+AccuracySec=15s
+Unit=zernoru-pull.service
+Persistent=true
+
+[Install]
+WantedBy=timers.target

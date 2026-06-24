@@ -149,14 +149,9 @@ http://192.168.1.50:18081
 
 Для сервера используется `docker-compose.prod.yml`. В production frontend слушает `5173`, чтобы совпадать с nginx-upstream.
 
-GitHub Actions workflow `Deploy ZernoRU` запускается на `push` в `main` и на ручной `workflow_dispatch`.
+Автообновление сервера сделано через обычный `git pull`-скрипт:
 
-Нужные secrets в GitHub:
+- `deploy/zernoru-pull.sh`
+- он делает `git fetch`, `git reset --hard origin/main`, `git clean -fdx` и затем `docker compose -p zernoru -f docker-compose.prod.yml up -d --build --remove-orphans`
 
-- `DEPLOY_HOST` - адрес сервера
-- `DEPLOY_USER` - пользователь для SSH
-- `DEPLOY_PORT` - SSH-порт, если не `22`
-- `DEPLOY_PATH` - каталог на сервере, куда синхронизируется репозиторий
-- `DEPLOY_SSH_KEY` - private key для SSH-доступа
-
-Workflow синхронизирует код на сервер, затем выполняет `docker compose -p zernoru -f docker-compose.prod.yml up -d --build --remove-orphans`.
+На сервере этот скрипт запускается через `systemd` timer или вручную, без GitHub Actions.
